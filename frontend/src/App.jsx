@@ -1,0 +1,289 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { clearHistory, getDownloads, getYandexAuthStatus } from './api'
+import { accent, bg, border, text } from './theme'
+import DownloadReportModal from './components/DownloadReportModal'
+import DownloadsPanel from './components/DownloadsPanel'
+import QueuePanel from './components/QueuePanel'
+import SearchPanel from './components/SearchPanel'
+import YandexAuthModal from './components/YandexAuthModal'
+
+function trackColor(id) {
+  const palette = ['#1e1b22','#191d24','#1b1f1b','#1a1e1b','#201c1c','#1e1c1a','#191e1e','#1d1b1f']
+  const n = typeof id === 'string'
+    ? id.split('').reduce((a, c) => a + c.charCodeAt(0), 0)
+    : (Number(id) || 0)
+  return palette[n % palette.length]
+}
+
+function Toast({ toasts }) {
+  if (!toasts.length) return null
+  return (
+    <div style={{ position: 'fixed', top: 64, right: 20, zIndex: 400, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
+      {toasts.map(t => (
+        <div key={t.id} style={{
+          background: '#28272b', border: '1px solid #3f3f46', borderRadius: 9,
+          padding: '10px 14px', fontSize: 13, color: '#fafafa',
+          display: 'flex', alignItems: 'center', gap: 9,
+          animation: 'toastIn 0.2s ease', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
+          maxWidth: 300, pointerEvents: 'all',
+        }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || '#22c55e'} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          <span style={{ lineHeight: 1.4 }}>{t.msg}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('search')
+  const [queue, setQueue] = useState([])
+  const [downloads, setDownloads] = useState([])
+  const [yandexConnected, setYandexConnected] = useState(false)
+  const [toasts, setToasts] = useState([])
+  const [activeBatch, setActiveBatch] = useState(null) // Set of backend download IDs
+  const [batchReport, setBatchReport] = useState(null) // {done: [], errors: []}
+  const [showYandexModal, setShowYandexModal] = useState(false)
+  const pollRef = useRef(null)
+
+  useEffect(() => {
+    getYandexAuthStatus().then(s => setYandexConnected(!!s.connected))
+  }, [])
+
+  useEffect(() => {
+    pollRef.current = setInterval(async () => {
+      const data = await getDownloads()
+      setDownloads(data)
+    }, 800)
+    return () => clearInterval(pollRef.current)
+  }, [])
+
+  // Detect when all downloads in the active batch are finished
+  useEffect(() => {
+    if (!activeBatch || activeBatch.size === 0) return
+    const batchDls = downloads.filter(d => activeBatch.has(d.id))
+    if (batchDls.length === 0) return
+    const terminal = ['done', 'error']
+    const allDone = batchDls.every(d => terminal.includes(d.status))
+    if (allDone && batchDls.length >= activeBatch.size) {
+      setBatchReport({
+        done: batchDls.filter(d => d.status === 'done'),
+        errors: batchDls.filter(d => d.status === 'error'),
+      })
+      setActiveBatch(null)
+    }
+  }, [downloads, activeBatch])
+
+  const showToast = useCallback((msg, type = 'success') => {
+    const id = Date.now() + Math.random()
+    const iconColor = { success: '#22c55e', info: '#3b82f6', error: '#ef4444' }[type] || '#22c55e'
+    setToasts(prev => [...prev, { id, msg, iconColor }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2600)
+  }, [])
+
+  const addToQueue = useCallback((track) => {
+    setQueue(prev => {
+      if (prev.find(i => i.id === track.id)) return prev
+      return [...prev, {
+        id: track.id,
+        url: track.url,
+        artwork_url: track.artwork_url || null,
+        title: track.title,
+        artist: track.artist,
+        album: track.album || '',
+        genre: track.genre || '',
+        color: trackColor(track.id),
+      }]
+    })
+    showToast(`${track.title} — added to queue`)
+  }, [showToast])
+
+  const removeFromQueue = useCallback((id) => {
+    setQueue(prev => prev.filter(i => i.id !== id))
+  }, [])
+
+  const updateQueueItem = useCallback((id, updates) => {
+    setQueue(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
+  }, [])
+
+  const clearQueue = useCallback(() => setQueue([]), [])
+
+  const onClearHistory = useCallback(async () => {
+    await clearHistory()
+    setDownloads([])
+  }, [])
+
+  const handleYandexAuthSuccess = useCallback(() => {
+    setYandexConnected(true)
+    setShowYandexModal(false)
+    showToast('Yandex Music connected', 'success')
+  }, [showToast])
+
+  const onDownloaded = useCallback((queueIds, downloadIds = []) => {
+    setQueue(prev => prev.filter(i => !queueIds.includes(i.id)))
+    setActiveTab('downloads')
+    showToast(`Downloading ${queueIds.length} track${queueIds.length !== 1 ? 's' : ''}`, 'info')
+    if (downloadIds.length > 0) setActiveBatch(new Set(downloadIds))
+  }, [showToast])
+
+  const activeDl = downloads.filter(d => ['downloading', 'converting', 'tagging'].includes(d.status)).length
+  const queueCount = queue.length
+
+  const tabBtn = (id, label, icon, badge) => {
+    const isActive = activeTab === id
+    return (
+      <button
+        key={id}
+        onClick={() => setActiveTab(id)}
+        style={{
+          cursor: 'pointer', padding: '0 20px', height: '100%',
+          border: 'none', background: 'none',
+          fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
+          fontWeight: isActive ? 600 : 400,
+          color: isActive ? text.primary : text.muted,
+          position: 'relative', display: 'flex', alignItems: 'center',
+          gap: 7, flexShrink: 0, transition: 'color 0.15s', whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = text.secondary }}
+        onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = text.muted }}
+      >
+        {icon}
+        {label}
+        {badge != null && badge > 0 && (
+          <span style={{
+            background: id === 'downloads' ? '#3b82f6' : '#f97316',
+            color: 'white', borderRadius: 10, padding: '1px 7px',
+            fontSize: 11, fontWeight: 700, lineHeight: '16px',
+            minWidth: 18, textAlign: 'center', display: 'inline-block',
+          }}>{badge}</span>
+        )}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
+          background: isActive ? '#f97316' : 'transparent',
+          borderRadius: '1px 1px 0 0',
+        }} />
+      </button>
+    )
+  }
+
+  return (
+    <div style={{ minHeight: '100vh', background: bg.page, color: text.primary, display: 'flex', flexDirection: 'column' }}>
+      {/* NAV — darker than page bg to act as visual anchor/frame */}
+      <nav style={{
+        borderBottom: `1px solid ${border.subtle}`,
+        background: `rgba(6,6,10,0.97)`,
+        backdropFilter: 'blur(12px)',
+        position: 'sticky', top: 0, zIndex: 50,
+      }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', height: 52, gap: 0 }}>
+          {/* Logo */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 32, flexShrink: 0 }}>
+            <div style={{
+              width: 28, height: 28, borderRadius: 7,
+              background: 'linear-gradient(135deg, #f97316, #c2410c)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 2px 10px rgba(249,115,22,0.35)',
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18V5l12-2v13"/>
+                <circle cx="6" cy="18" r="3"/>
+                <circle cx="18" cy="16" r="3"/>
+              </svg>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em' }}>
+              Sound<span style={{ color: '#f97316' }}>Save</span>
+            </span>
+          </div>
+
+          {/* Tabs */}
+          <div style={{ display: 'flex', alignItems: 'stretch', height: '100%', flex: 1, gap: 0 }}>
+            {tabBtn('search', 'Search', (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+            ), null)}
+            {tabBtn('queue', 'Queue', (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="21" y1="10" x2="7" y2="10"/>
+                <line x1="21" y1="6" x2="3" y2="6"/>
+                <line x1="21" y1="14" x2="7" y2="14"/>
+                <line x1="21" y1="18" x2="3" y2="18"/>
+              </svg>
+            ), queueCount)}
+            {tabBtn('downloads', 'Downloads', (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+            ), activeDl)}
+          </div>
+
+          {/* Yandex pill */}
+          <button
+            onClick={() => setShowYandexModal(true)}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '5px 10px', background: 'transparent',
+              border: `1px solid ${yandexConnected ? 'rgba(34,197,94,0.3)' : border.subtle}`, borderRadius: 6,
+              cursor: 'pointer', flexShrink: 0, transition: 'border-color 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.5)' : '#3f3f46'}
+            onMouseLeave={e => e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.3)' : '#27272a'}
+          >
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: yandexConnected ? '#22c55e' : '#3f3f46', flexShrink: 0 }} />
+            <span style={{ fontSize: 12, color: yandexConnected ? '#a1a1aa' : '#71717a', whiteSpace: 'nowrap' }}>
+              {yandexConnected ? 'Yandex Connected' : 'Yandex Music'}
+            </span>
+          </button>
+        </div>
+      </nav>
+
+      {/* MAIN */}
+      <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: '28px 24px', width: '100%' }}>
+        <div key={activeTab} style={{ animation: 'panelIn 0.28s cubic-bezier(0.16,1,0.3,1) both' }}>
+        {activeTab === 'search' && (
+          <SearchPanel
+            onAddToQueue={addToQueue}
+            showToast={showToast}
+            yandexConnected={yandexConnected}
+            onYandexConnected={handleYandexAuthSuccess}
+            onOpenYandexAuth={() => setShowYandexModal(true)}
+          />
+        )}
+        {activeTab === 'queue' && (
+          <QueuePanel
+            queue={queue}
+            onRemove={removeFromQueue}
+            onUpdate={updateQueueItem}
+            onClear={clearQueue}
+            onDownloaded={onDownloaded}
+            showToast={showToast}
+          />
+        )}
+        {activeTab === 'downloads' && (
+          <DownloadsPanel downloads={downloads} onClearHistory={onClearHistory} />
+        )}
+        </div>
+      </main>
+
+      {showYandexModal && (
+        <YandexAuthModal
+          isConnected={yandexConnected}
+          onSuccess={handleYandexAuthSuccess}
+          onDisconnect={() => { setYandexConnected(false); showToast('Yandex Music disconnected') }}
+          onClose={() => setShowYandexModal(false)}
+        />
+      )}
+      {batchReport && (
+        <DownloadReportModal
+          report={batchReport}
+          onClose={() => setBatchReport(null)}
+        />
+      )}
+      <Toast toasts={toasts} />
+    </div>
+  )
+}
