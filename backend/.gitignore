@@ -153,6 +153,12 @@ activemq-data/
 yandex_token.txt
 *.token
 
+# Database
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+
 # Environments
 .env
 .envrc
