@@ -147,13 +147,21 @@ export default function DownloadsPanel({ downloads, onClearHistory }) {
 
   if (!downloads.length) {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '88px 0', gap: 14, textAlign: 'center', animation: 'fadeIn 0.2s ease' }}>
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round">
+      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', animation: 'fadeIn 0.2s ease', overflow: 'hidden' }}>
+        <div style={{
+          position: 'absolute', inset: 0,
+          backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
+          backgroundSize: '28px 28px',
+          WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+          maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+          pointerEvents: 'none',
+        }} />
+        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
           <polyline points="7 10 12 15 17 10"/>
           <line x1="12" y1="15" x2="12" y2="3"/>
         </svg>
-        <div>
+        <div style={{ position: 'relative' }}>
           <p style={{ fontSize: 15, color: '#52525b', fontWeight: 500, marginBottom: 6 }}>No downloads yet</p>
           <p style={{ fontSize: 13, color: '#3f3f46' }}>Add tracks to queue and click Download All</p>
         </div>
