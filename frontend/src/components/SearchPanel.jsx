@@ -1,0 +1,461 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { importFromYandex, resolveUrl, searchTracks } from '../api'
+import { accent, bg, border, text } from '../theme'
+
+const SC_URL = /soundcloud\.com\//i
+const YM_URL = /music\.yandex\.(ru|com)\/playlists\//i
+
+function fmt(sec) {
+  if (!sec) return ''
+  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
+}
+
+function TrackCard({ track, isAdded, onAdd, index }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <div
+      style={{
+        background: bg.surface,
+        border: `1px solid ${hov ? (isAdded ? border.strong : border.accent) : border.default}`,
+        borderRadius: 10, overflow: 'hidden',
+        transition: 'border-color 0.2s, transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s',
+        transform: hov ? 'translateY(-2px)' : 'translateY(0)',
+        boxShadow: hov ? '0 12px 32px rgba(0,0,0,0.55)' : '0 0 0 rgba(0,0,0,0)',
+        animation: 'cardIn 0.4s cubic-bezier(0.16,1,0.3,1) both',
+        animationDelay: `${Math.min(index * 40, 480)}ms`,
+        cursor: 'pointer',
+      }}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      onClick={() => !isAdded && onAdd()}
+    >
+      {/* Artwork */}
+      <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || '#18181b' }}>
+        {track.artwork_url ? (
+          <img
+            src={track.artwork_url}
+            alt={track.title}
+            style={{
+              position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover',
+              transition: 'transform 0.3s cubic-bezier(0.16,1,0.3,1)',
+              transform: hov ? 'scale(1.04)' : 'scale(1)',
+            }}
+            loading="lazy"
+          />
+        ) : (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.13)" strokeWidth="1" strokeLinecap="round">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+          </div>
+        )}
+
+        {/* Hover overlay */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          background: isAdded
+            ? 'rgba(0,0,0,0.45)'
+            : `rgba(0,0,0,${hov ? 0.42 : 0})`,
+          transition: 'background 0.22s',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          {isAdded ? (
+            <div style={{
+              width: 38, height: 38, borderRadius: '50%',
+              background: 'rgba(34,197,94,0.85)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+          ) : hov && (
+            <div style={{
+              width: 40, height: 40, borderRadius: '50%',
+              background: 'rgba(249,115,22,0.9)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              boxShadow: '0 4px 16px rgba(249,115,22,0.5)',
+              animation: 'fadeIn 0.15s ease',
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </div>
+          )}
+        </div>
+
+        {track.duration > 0 && (
+          <div style={{
+            position: 'absolute', bottom: 7, right: 7,
+            background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)',
+            borderRadius: 4, padding: '2px 6px', fontSize: 11,
+            color: '#d4d4d8', fontFamily: "'JetBrains Mono', monospace",
+            transition: 'opacity 0.2s',
+            opacity: hov ? 0 : 1,
+          }}>
+            {fmt(track.duration)}
+          </div>
+        )}
+      </div>
+
+      {/* Info */}
+      <div style={{ padding: '11px 12px 12px' }}>
+        <div style={{ fontWeight: 600, fontSize: 13, color: hov ? '#fff' : '#fafafa', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.title}</div>
+        <div style={{ fontSize: 12, color: hov ? '#a1a1aa' : '#71717a', marginBottom: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.artist}</div>
+        <AddButton isAdded={isAdded} onAdd={e => { e.stopPropagation(); onAdd() }} />
+      </div>
+    </div>
+  )
+}
+
+function AddButton({ isAdded, onAdd }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onAdd}
+      disabled={isAdded}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        padding: '6px 10px', borderRadius: 6,
+        background: hov && !isAdded ? 'rgba(249,115,22,0.07)' : 'transparent',
+        cursor: isAdded ? 'default' : 'pointer',
+        display: 'flex', alignItems: 'center', gap: 5,
+        width: '100%', justifyContent: 'center',
+        fontSize: 12, fontWeight: 500,
+        fontFamily: "'Space Grotesk', sans-serif",
+        transition: 'background 0.1s',
+        border: `1px solid ${isAdded ? '#27272a' : '#f97316'}`,
+        color: isAdded ? '#52525b' : '#f97316',
+      }}
+    >
+      {isAdded ? (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      ) : (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+          <path d="M12 5v14M5 12h14"/>
+        </svg>
+      )}
+      {isAdded ? 'Added' : 'Add to Queue'}
+    </button>
+  )
+}
+
+export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+  const [loadingMsg, setLoadingMsg] = useState('')
+  const [importStats, setImportStats] = useState(null)
+  const [error, setError] = useState('')
+  const [added, setAdded] = useState(new Set())
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(false)
+  const pendingYandexUrl = useRef(null)
+  const debounce = useRef(null)
+  const currentQuery = useRef('')
+
+  const PAGE_SIZE = 20
+
+  const doSearch = useCallback(async (q, p = 1) => {
+    if (!q.trim()) { setResults([]); setImportStats(null); setPage(1); setHasMore(false); return }
+    setLoading(true)
+    setError('')
+    if (p === 1) setImportStats(null)
+    currentQuery.current = q
+    try {
+      let tracks
+      if (YM_URL.test(q)) {
+        setLoadingMsg('Fetching Yandex Music playlist…')
+        try {
+          const res = await importFromYandex(q)
+          tracks = res.results || []
+          setImportStats({ total: res.total, found: res.found, not_found: res.not_found })
+          setHasMore(false)
+        } catch (e) {
+          if (e.code === 'YANDEX_NOT_CONNECTED') {
+            pendingYandexUrl.current = q
+            onOpenYandexAuth?.()
+            setLoading(false)
+            setLoadingMsg('')
+            return
+          }
+          throw e
+        }
+      } else if (SC_URL.test(q)) {
+        setLoadingMsg('Resolving SoundCloud URL…')
+        const res = await resolveUrl(q)
+        if (res.type === 'playlist') tracks = res.tracks || []
+        else if (res.id) tracks = [res]
+        else tracks = []
+        setHasMore(false)
+      } else {
+        setLoadingMsg('')
+        const res = await searchTracks(q, p, PAGE_SIZE)
+        tracks = res.results || []
+        setHasMore(res.has_more)
+        setPage(p)
+      }
+      setResults(tracks)
+    } catch {
+      setError('Failed. Check the URL or try again.')
+      setResults([])
+    } finally {
+      setLoading(false)
+      setLoadingMsg('')
+    }
+  }, [])
+
+  const handleInput = (e) => {
+    const val = e.target.value
+    setQuery(val)
+    setPage(1)
+    clearTimeout(debounce.current)
+    debounce.current = setTimeout(() => doSearch(val, 1), 500)
+  }
+
+  const handleAdd = (track) => {
+    onAddToQueue(track)
+    setAdded(prev => new Set(prev).add(track.id))
+  }
+
+  const handleAddAll = () => {
+    const toAdd = results.filter(t => !added.has(t.id))
+    toAdd.forEach(t => handleAdd(t))
+  }
+
+  const addAllCount = results.filter(t => !added.has(t.id)).length
+
+  const goToPage = (p) => {
+    doSearch(currentQuery.current || query, p)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // When yandexConnected becomes true, retry any pending Yandex URL
+  useEffect(() => {
+    if (yandexConnected && pendingYandexUrl.current) {
+      doSearch(pendingYandexUrl.current)
+      pendingYandexUrl.current = null
+    }
+  }, [yandexConnected, doSearch])
+
+  return (
+    <>
+      <div style={{ animation: 'fadeIn 0.2s ease' }}>
+        {/* Search bar */}
+        <div style={{ position: 'relative', marginBottom: 24 }}>
+          <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#52525b', display: 'flex', pointerEvents: 'none' }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </div>
+          <SearchInput value={query} onChange={handleInput} loading={loading} />
+        </div>
+
+        {/* Results toolbar */}
+        {results.length > 0 && !loading && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <span style={{ fontSize: 13, color: '#52525b' }}>
+              {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + results.length} tracks
+              {hasMore && <span> · more available</span>}
+              {importStats && <span> · {importStats.not_found} not found on SoundCloud</span>}
+            </span>
+            {addAllCount > 0 && (
+              <button
+                onClick={handleAddAll}
+                style={{
+                  padding: '7px 14px', background: '#f97316', border: 'none', borderRadius: 7,
+                  color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = '#c2410c'}
+                onMouseLeave={e => e.currentTarget.style.background = '#f97316'}
+              >
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Add All ({addAllCount})
+              </button>
+            )}
+          </div>
+        )}
+
+        {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</p>}
+
+        {/* Loading skeleton */}
+        {loading && (
+          <div>
+            {loadingMsg && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+                </svg>
+                <span style={{ fontSize: 13, color: '#52525b' }}>{loadingMsg}</span>
+              </div>
+            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 13 }}>
+              {Array.from({ length: 10 }).map((_, i) => (
+                <div key={i} style={{ borderRadius: 10, overflow: 'hidden', background: bg.surface, border: `1px solid ${border.default}`, animationDelay: `${i * 60}ms` }}>
+                  <div className="skeleton" style={{ width: '100%', paddingBottom: '100%' }} />
+                  <div style={{ padding: '11px 12px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                    <div className="skeleton" style={{ height: 14, width: '80%' }} />
+                    <div className="skeleton" style={{ height: 12, width: '55%' }} />
+                    <div className="skeleton" style={{ height: 30, width: '100%', marginTop: 2 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Track grid */}
+        {!loading && results.length > 0 && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 13 }}>
+              {results.map((track, index) => (
+                <TrackCard
+                  key={track.id}
+                  track={track}
+                  index={index}
+                  isAdded={added.has(track.id)}
+                  onAdd={() => handleAdd(track)}
+                />
+              ))}
+            </div>
+            {(page > 1 || hasMore) && (
+              <Pagination page={page} hasMore={hasMore} onChange={goToPage} />
+            )}
+          </>
+        )}
+
+        {/* Empty state */}
+        {!loading && results.length === 0 && !query.trim() && !error && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '88px 0', gap: 14, textAlign: 'center' }}>
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+            <div>
+              <p style={{ fontSize: 15, color: '#52525b', fontWeight: 500, marginBottom: 6 }}>Search for music</p>
+              <p style={{ fontSize: 13, color: '#3f3f46', maxWidth: 320, lineHeight: 1.6 }}>Paste a SoundCloud or Yandex Music URL, or type a track or artist name</p>
+            </div>
+          </div>
+        )}
+
+        {!loading && results.length === 0 && query.trim() && !error && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '88px 0' }}>
+            <p style={{ fontSize: 14, color: '#52525b' }}>No results for "{query}"</p>
+          </div>
+        )}
+      </div>
+    </>
+  )
+}
+
+function Pagination({ page, hasMore, onChange }) {
+  const visiblePages = []
+  const start = Math.max(1, page - 2)
+  for (let i = start; i <= page + (hasMore ? 1 : 0); i++) visiblePages.push(i)
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 28 }}>
+      <NavBtn disabled={page === 1} onClick={() => onChange(page - 1)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+      </NavBtn>
+
+      {start > 1 && (
+        <>
+          <PageBtn p={1} active={false} onClick={() => onChange(1)} />
+          {start > 2 && <span style={{ color: '#3f3f46', fontSize: 13 }}>…</span>}
+        </>
+      )}
+
+      {visiblePages.map(p => (
+        <PageBtn key={p} p={p} active={p === page} onClick={() => onChange(p)} />
+      ))}
+
+      {hasMore && <span style={{ color: '#3f3f46', fontSize: 13 }}>…</span>}
+
+      <NavBtn disabled={!hasMore} onClick={() => onChange(page + 1)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>
+      </NavBtn>
+    </div>
+  )
+}
+
+function PageBtn({ p, active, onClick }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: 34, height: 34, borderRadius: 7, border: 'none',
+        background: active ? '#f97316' : hov ? '#27272a' : 'transparent',
+        color: active ? 'white' : hov ? '#fafafa' : '#71717a',
+        fontSize: 13, fontWeight: active ? 700 : 400,
+        cursor: 'pointer', transition: 'all 0.15s',
+        fontFamily: "'Space Grotesk', sans-serif",
+        boxShadow: active ? '0 2px 10px rgba(249,115,22,0.4)' : 'none',
+      }}
+    >
+      {p}
+    </button>
+  )
+}
+
+function NavBtn({ disabled, onClick, children }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        width: 34, height: 34, borderRadius: 7,
+        background: hov && !disabled ? '#27272a' : 'transparent',
+        border: '1px solid #27272a',
+        color: disabled ? '#3f3f46' : hov ? '#fafafa' : '#71717a',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'all 0.15s',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+function SearchInput({ value, onChange, loading }) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <input
+      type="text"
+      value={value}
+      onChange={onChange}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      placeholder="Search tracks, artists, or paste URL…"
+      autoFocus
+      style={{
+        width: '100%', padding: '12px 44px',
+        background: bg.surface,
+        border: `1px solid ${focused ? accent[500] : border.default}`,
+        borderRadius: 10, color: text.primary, fontSize: 15,
+        transition: 'border-color 0.15s, box-shadow 0.15s',
+        boxShadow: focused ? `0 0 0 3px ${accent.subtle}, 0 0 0 1px ${accent[500]}` : 'none',
+        outline: 'none',
+      }}
+    />
+  )
+}
