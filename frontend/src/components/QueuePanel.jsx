@@ -89,33 +89,31 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const queueTotalMins = Math.floor(queueTotalSecs / 60)
   const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
 
-  if (!queue.length) {
-    return (
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', animation: 'fadeIn 0.2s ease', overflow: 'hidden' }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-          maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-          pointerEvents: 'none',
-        }} />
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
-          <line x1="21" y1="10" x2="7" y2="10"/>
-          <line x1="21" y1="6" x2="3" y2="6"/>
-          <line x1="21" y1="14" x2="7" y2="14"/>
-          <line x1="21" y1="18" x2="3" y2="18"/>
-        </svg>
-        <div style={{ position: 'relative' }}>
-          <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
-          <p style={{ fontSize: 13, color: '#3f3f46' }}>Add tracks from Search to build your download queue</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
+      {!queue.length ? (
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+            maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+            pointerEvents: 'none',
+          }} />
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
+            <line x1="21" y1="10" x2="7" y2="10"/>
+            <line x1="21" y1="6" x2="3" y2="6"/>
+            <line x1="21" y1="14" x2="7" y2="14"/>
+            <line x1="21" y1="18" x2="3" y2="18"/>
+          </svg>
+          <div style={{ position: 'relative' }}>
+            <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
+            <p style={{ fontSize: 13, color: text.muted, opacity: 0.7 }}>Add tracks from Search to build your download queue</p>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -249,6 +247,8 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
           )
         })}
       </div>
+        </>
+      )}
     </div>
   )
 }
@@ -256,17 +256,22 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
 function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
+  const [rowHov, setRowHov] = useState(false)
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
-      gap: 8, padding: '5px 8px',
-      borderRadius: isExpanded ? '7px 7px 0 0' : 7,
-      background: isExpanded
-        ? 'rgba(234,179,8,0.04)'
-        : isSelected ? 'rgba(249,115,22,0.05)' : 'transparent',
-      borderBottom: isExpanded ? '1px solid rgba(234,179,8,0.15)' : 'none',
-      alignItems: 'center', transition: 'background 0.1s',
-    }}>
+    <div
+      onMouseEnter={() => setRowHov(true)}
+      onMouseLeave={() => setRowHov(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
+        gap: 8, padding: '5px 8px',
+        borderRadius: isExpanded ? '7px 7px 0 0' : 7,
+        background: isExpanded
+          ? 'rgba(234,179,8,0.04)'
+          : isSelected ? 'rgba(249,115,22,0.05)'
+          : rowHov ? 'rgba(255,255,255,0.03)' : 'transparent',
+        borderBottom: isExpanded ? '1px solid rgba(234,179,8,0.15)' : 'none',
+        alignItems: 'center', transition: 'background 0.1s',
+      }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <input type="checkbox" checked={isSelected} onChange={onToggle} style={{ width: 15, height: 15 }} />
       </div>
