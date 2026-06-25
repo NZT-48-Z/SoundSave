@@ -52,6 +52,16 @@ export async function getAlternatives(title, artist, limit = 5) {
   return r.json()
 }
 
+export async function importBatch(items) {
+  const r = await fetch(`${BASE}/import/batch`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() // { results: [{ value, track, error }], found, not_found }
+}
+
 export async function startBulkDownload(items) {
   const r = await fetch(`${BASE}/download/bulk`, {
     method: 'POST',
