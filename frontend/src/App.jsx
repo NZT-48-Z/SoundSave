@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { clearHistory, getDownloads, getYandexAuthStatus } from './api'
-import { accent, bg, border, text } from './theme'
+import { accent, bg, border, semantic, text } from './theme'
 import DownloadReportModal from './components/DownloadReportModal'
 import DownloadsPanel from './components/DownloadsPanel'
 import QueuePanel from './components/QueuePanel'
@@ -22,8 +22,8 @@ function Toast({ toasts }) {
     <div style={{ position: 'fixed', top: 64, right: 20, zIndex: 400, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
       {toasts.map(t => (
         <div key={t.id} style={{
-          background: '#28272b', border: '1px solid #3f3f46', borderRadius: 9,
-          padding: '10px 14px', fontSize: 13, color: '#fafafa',
+          background: bg.overlay, border: `1px solid ${border.default}`, borderRadius: 9,
+          padding: '10px 14px', fontSize: 13, color: text.primary,
           display: 'flex', alignItems: 'center', gap: 9,
           animation: 'toastIn 0.2s ease', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           maxWidth: 300, pointerEvents: 'all',
@@ -160,32 +160,38 @@ export default function App() {
         key={id}
         onClick={() => setActiveTab(id)}
         style={{
-          cursor: 'pointer', padding: '0 20px', height: '100%',
-          border: 'none', background: 'none',
-          fontFamily: "'Space Grotesk', sans-serif", fontSize: 14,
+          cursor: 'pointer', padding: '0 14px', height: 34, borderRadius: 8,
+          border: `1px solid ${isActive ? 'rgba(249,115,22,0.22)' : 'transparent'}`,
+          background: isActive ? 'rgba(249,115,22,0.1)' : 'transparent',
+          fontFamily: "'Space Grotesk', sans-serif", fontSize: 13,
           fontWeight: isActive ? 600 : 400,
-          color: isActive ? text.primary : text.muted,
-          position: 'relative', display: 'flex', alignItems: 'center',
-          gap: 7, flexShrink: 0, transition: 'color 0.15s', whiteSpace: 'nowrap',
+          color: isActive ? accent[500] : text.muted,
+          display: 'flex', alignItems: 'center',
+          gap: 6, flexShrink: 0, transition: 'all 0.15s', whiteSpace: 'nowrap',
         }}
-        onMouseEnter={e => { if (!isActive) e.currentTarget.style.color = text.secondary }}
-        onMouseLeave={e => { if (!isActive) e.currentTarget.style.color = text.muted }}
+        onMouseEnter={e => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+            e.currentTarget.style.color = text.secondary
+          }
+        }}
+        onMouseLeave={e => {
+          if (!isActive) {
+            e.currentTarget.style.background = 'transparent'
+            e.currentTarget.style.color = text.muted
+          }
+        }}
       >
         {icon}
         {label}
         {badge != null && badge > 0 && (
           <span style={{
-            background: id === 'downloads' ? '#3b82f6' : '#f97316',
+            background: id === 'downloads' ? semantic.info : accent[500],
             color: 'white', borderRadius: 10, padding: '1px 7px',
             fontSize: 11, fontWeight: 700, lineHeight: '16px',
             minWidth: 18, textAlign: 'center', display: 'inline-block',
           }}>{badge}</span>
         )}
-        <div style={{
-          position: 'absolute', bottom: 0, left: 0, right: 0, height: 2,
-          background: isActive ? '#f97316' : 'transparent',
-          borderRadius: '1px 1px 0 0',
-        }} />
       </button>
     )
   }
@@ -194,33 +200,37 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: bg.page, color: text.primary, display: 'flex', flexDirection: 'column' }}>
       {/* NAV — darker than page bg to act as visual anchor/frame */}
       <nav style={{
-        borderBottom: `1px solid ${border.subtle}`,
-        background: `rgba(6,6,10,0.97)`,
-        backdropFilter: 'blur(12px)',
+        borderBottom: `1px solid ${border.default}`,
+        background: `rgba(6,6,10,0.98)`,
+        backdropFilter: 'blur(16px)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.35)',
         position: 'sticky', top: 0, zIndex: 50,
       }}>
-        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', height: 52, gap: 0 }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', alignItems: 'center', height: 58, gap: 0 }}>
           {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 32, flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 16, flexShrink: 0 }}>
             <div style={{
-              width: 28, height: 28, borderRadius: 7,
+              width: 30, height: 30, borderRadius: 8,
               background: 'linear-gradient(135deg, #f97316, #c2410c)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: '0 2px 10px rgba(249,115,22,0.35)',
+              boxShadow: '0 2px 12px rgba(249,115,22,0.4)',
             }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 18V5l12-2v13"/>
                 <circle cx="6" cy="18" r="3"/>
                 <circle cx="18" cy="16" r="3"/>
               </svg>
             </div>
             <span style={{ fontWeight: 700, fontSize: 15, letterSpacing: '-0.02em' }}>
-              Sound<span style={{ color: '#f97316' }}>Save</span>
+              Sound<span style={{ color: accent[500] }}>Save</span>
             </span>
           </div>
 
+          {/* Logo / tabs separator */}
+          <div style={{ width: 1, height: 20, background: border.default, marginRight: 16, flexShrink: 0 }} />
+
           {/* Tabs */}
-          <div style={{ display: 'flex', alignItems: 'stretch', height: '100%', flex: 1, gap: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, gap: 4 }}>
             {tabBtn('search', 'Search', (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
@@ -247,16 +257,27 @@ export default function App() {
           <button
             onClick={() => setShowYandexModal(true)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '5px 10px', background: 'transparent',
-              border: `1px solid ${yandexConnected ? 'rgba(34,197,94,0.3)' : border.subtle}`, borderRadius: 6,
-              cursor: 'pointer', flexShrink: 0, transition: 'border-color 0.15s',
+              display: 'flex', alignItems: 'center', gap: 7,
+              padding: '0 12px', height: 34,
+              background: yandexConnected ? 'rgba(34,197,94,0.07)' : 'transparent',
+              border: `1px solid ${yandexConnected ? 'rgba(34,197,94,0.25)' : border.default}`,
+              borderRadius: 8, cursor: 'pointer', flexShrink: 0, transition: 'all 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.5)' : '#3f3f46'}
-            onMouseLeave={e => e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.3)' : '#27272a'}
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.45)' : border.strong
+              e.currentTarget.style.background = yandexConnected ? 'rgba(34,197,94,0.1)' : 'rgba(255,255,255,0.04)'
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = yandexConnected ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.09)'
+              e.currentTarget.style.background = yandexConnected ? 'rgba(34,197,94,0.07)' : 'transparent'
+            }}
           >
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: yandexConnected ? '#22c55e' : '#3f3f46', flexShrink: 0 }} />
-            <span style={{ fontSize: 12, color: yandexConnected ? '#a1a1aa' : '#71717a', whiteSpace: 'nowrap' }}>
+            <div style={{
+              width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
+              background: yandexConnected ? semantic.success : text.muted,
+              boxShadow: yandexConnected ? '0 0 6px rgba(34,197,94,0.6)' : 'none',
+            }} />
+            <span style={{ fontSize: 12, fontWeight: 500, color: yandexConnected ? semantic.success : text.muted, whiteSpace: 'nowrap' }}>
               {yandexConnected ? 'Yandex Connected' : 'Yandex Music'}
             </span>
           </button>
