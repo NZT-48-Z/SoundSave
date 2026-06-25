@@ -103,13 +103,13 @@ export default function DownloadReportModal({ report, onClose }) {
             onClick={onClose}
             style={{
               width: '100%', padding: '10px 16px',
-              background: '#27272a', border: 'none', borderRadius: 8,
-              color: text.primary, fontSize: 14, fontWeight: 600,
+              background: 'transparent', border: `1px solid ${border.default}`, borderRadius: 8,
+              color: text.secondary, fontSize: 14, fontWeight: 600,
               cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
-              transition: 'background 0.15s',
+              transition: 'all 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#3f3f46'}
-            onMouseLeave={e => e.currentTarget.style.background = '#27272a'}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#eeeef2' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9898a6' }}
           >
             Close
           </button>
