@@ -1,4 +1,4 @@
-import { text } from '../theme'
+import { bg, text } from '../theme'
 
 // Shared empty-state block (dotted backdrop + icon + copy).
 // Pass the icon's inner SVG elements as children.
@@ -7,7 +7,7 @@ export default function EmptyState({ title, subtitle, children }) {
     <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
       <div style={{
         position: 'absolute', inset: 0,
-        backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
+        backgroundImage: `radial-gradient(circle, ${bg.dot} 1px, transparent 1px)`,
         backgroundSize: '28px 28px',
         WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
         maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
