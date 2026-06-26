@@ -1,19 +1,19 @@
 import { useState } from 'react'
 import { cancelDownload } from '../api'
-import { bg, border, semantic, text } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtSpeed } from '../utils/format'
 import EmptyState from './EmptyState'
 
 const ACTIVE_STATUSES = new Set(['pending', 'downloading', 'converting', 'tagging'])
 
 const STATUS_MAP = {
-  pending:     { label: 'Pending',     color: '#a1a1aa', bg: 'rgba(161,161,170,0.08)' },
-  downloading: { label: 'Downloading', color: '#3b82f6', bg: 'rgba(59,130,246,0.1)'  },
-  converting:  { label: 'Converting',  color: '#f97316', bg: 'rgba(249,115,22,0.1)'  },
-  tagging:     { label: 'Tagging',     color: '#eab308', bg: 'rgba(234,179,8,0.1)'   },
-  done:        { label: 'Done',        color: '#22c55e', bg: 'rgba(34,197,94,0.08)'  },
-  cancelled:   { label: 'Cancelled',   color: '#71717a', bg: 'rgba(113,113,122,0.08)' },
-  error:       { label: 'Error',       color: '#ef4444', bg: 'rgba(239,68,68,0.1)'   },
+  pending:     { label: 'Pending',     color: neutral[400],    bg: 'rgba(161,161,170,0.08)' },
+  downloading: { label: 'Downloading', color: semantic.info,   bg: semantic.infoBg          },
+  converting:  { label: 'Converting',  color: accent[500],     bg: 'rgba(249,115,22,0.1)'   },
+  tagging:     { label: 'Tagging',     color: semantic.warning, bg: semantic.warningBg      },
+  done:        { label: 'Done',        color: semantic.success, bg: 'rgba(34,197,94,0.08)'  },
+  cancelled:   { label: 'Cancelled',   color: neutral[500],    bg: 'rgba(113,113,122,0.08)' },
+  error:       { label: 'Error',       color: semantic.error,  bg: semantic.errorBg         },
 }
 
 function statusColor(s) { return (STATUS_MAP[s] || STATUS_MAP.pending).color }
@@ -40,7 +40,7 @@ function DownloadRow({ dl }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: bg.surface, border: `1px solid ${border.default}`, borderRadius: 10 }}>
       <div style={{
         width: 48, height: 48, borderRadius: 7,
-        background: dl.color || '#1e1b22',
+        background: dl.color || neutral[900],
         display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden',
       }}>
         {dl.artwork_url ? (
@@ -179,7 +179,7 @@ export default function DownloadsPanel({ downloads, onClearHistory }) {
             fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s',
           }}
           onMouseEnter={e => { e.currentTarget.style.borderColor = semantic.error; e.currentTarget.style.color = semantic.error }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(255,255,255,0.09)'; e.currentTarget.style.color = '#9898a6' }}
+          onMouseLeave={e => { e.currentTarget.style.borderColor = border.default; e.currentTarget.style.color = text.secondary }}
         >
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
             <polyline points="3 6 5 6 21 6"/>
