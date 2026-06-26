@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { uploadCover } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
@@ -10,6 +10,12 @@ export default function CoverPickerModal({ item, onClose, onConfirm }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const inputRef = useRef()
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   const handleFile = (f) => {
     if (!f) return
