@@ -29,7 +29,7 @@ function InlineInput({ value, onChange, placeholder, color }) {
   )
 }
 
-export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownloaded, showToast }) {
+export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownloaded, showToast, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [selected, setSelected] = useState(new Set())
   const [bulkArtist, setBulkArtist] = useState('')
   const [bulkAlbum, setBulkAlbum] = useState('')
@@ -186,7 +186,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
 
       {/* Table header */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
+        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 28px 28px',
         gap: 8, padding: '0 8px 8px', borderBottom: `1px solid ${border.default}`, marginBottom: 2,
         alignItems: 'center',
       }}>
@@ -195,6 +195,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
         {['Title', 'Artist', 'Album', 'Genre'].map(h => (
           <div key={h} style={{ fontSize: 11, fontWeight: 600, color: text.muted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
         ))}
+        <div />
         <div />
       </div>
 
@@ -215,6 +216,10 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
                 onRemove={() => { onRemove(item.id); setSelected(prev => { const n = new Set(prev); n.delete(item.id); return n }); if (expandedId === item.id) setExpandedId(null) }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
                 onPickCover={() => setCoverPickerId(item.id)}
+                onPreview={() => onPreview(item)}
+                isPreviewActive={previewTrackId === item.id}
+                isPreviewPlaying={isPreviewPlaying}
+                previewLoading={previewLoading}
               />
               {expanded && modified && (
                 <AlternativesPanel
@@ -268,17 +273,18 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   )
 }
 
-function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover }) {
+function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
   const [thumbHov, setThumbHov] = useState(false)
+  const [playHov, setPlayHov] = useState(false)
   return (
     <div
       onMouseEnter={() => setRowHov(true)}
       onMouseLeave={() => setRowHov(false)}
       style={{
-        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
+        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 28px 28px',
         gap: 8, padding: '5px 8px',
         borderRadius: isExpanded ? '7px 7px 0 0' : 7,
         background: isExpanded
@@ -355,6 +361,35 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
       <InlineInput value={item.artist} onChange={v => onUpdate('artist', v)} placeholder="Artist" color={neutral[400]} />
       <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color={neutral[500]} />
       <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color={neutral[500]} />
+      <button
+        onClick={onPreview}
+        onMouseEnter={() => setPlayHov(true)}
+        onMouseLeave={() => setPlayHov(false)}
+        title="Preview"
+        style={{
+          width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: isPreviewActive ? 'rgba(249,115,22,0.12)' : playHov ? 'rgba(255,255,255,0.06)' : 'transparent',
+          border: `1px solid ${isPreviewActive ? 'rgba(249,115,22,0.35)' : 'transparent'}`,
+          borderRadius: 5,
+          color: isPreviewActive ? accent[500] : playHov ? text.secondary : neutral[600],
+          cursor: 'pointer', transition: 'all 0.1s', padding: 0,
+        }}
+      >
+        {isPreviewActive && previewLoading ? (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+            <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+          </svg>
+        ) : isPreviewActive && isPreviewPlaying ? (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="5" y="4" width="4" height="16" rx="1"/>
+            <rect x="15" y="4" width="4" height="16" rx="1"/>
+          </svg>
+        ) : (
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="5 3 19 12 5 21"/>
+          </svg>
+        )}
+      </button>
       <button
         onClick={onRemove}
         onMouseEnter={() => setDelHov(true)}
