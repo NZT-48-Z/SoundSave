@@ -3,14 +3,8 @@ import { startBulkDownload } from '../api'
 import { bg, border, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
+import EmptyState from './EmptyState'
 import { isModifiedTitle } from '../utils/trackModifiers'
-
-function fmt(sec) {
-  if (!sec) return null
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
 
 function InlineInput({ value, onChange, placeholder, color }) {
   const [focused, setFocused] = useState(false)
@@ -91,37 +85,20 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
     }
   }
 
-  // Queue total duration
-  const queueTotalSecs = queue.reduce((s, item) => {
-    const p = (item.duration || '0:00').toString().split(':').map(Number)
-    return s + (p.length === 2 ? p[0] * 60 + p[1] : 0)
-  }, 0)
+  // Queue total duration — durations are stored as numeric seconds
+  const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
   const queueTotalMins = Math.floor(queueTotalSecs / 60)
   const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
 
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
       {!queue.length ? (
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-            WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            pointerEvents: 'none',
-          }} />
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
-            <line x1="21" y1="10" x2="7" y2="10"/>
-            <line x1="21" y1="6" x2="3" y2="6"/>
-            <line x1="21" y1="14" x2="7" y2="14"/>
-            <line x1="21" y1="18" x2="3" y2="18"/>
-          </svg>
-          <div style={{ position: 'relative' }}>
-            <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
-            <p style={{ fontSize: 13, color: text.muted, opacity: 0.7 }}>Add tracks from Search to build your download queue</p>
-          </div>
-        </div>
+        <EmptyState title="Queue is empty" subtitle="Add tracks from Search to build your download queue">
+          <line x1="21" y1="10" x2="7" y2="10"/>
+          <line x1="21" y1="6" x2="3" y2="6"/>
+          <line x1="21" y1="14" x2="7" y2="14"/>
+          <line x1="21" y1="18" x2="3" y2="18"/>
+        </EmptyState>
       ) : (
         <>
       {/* Toolbar */}
