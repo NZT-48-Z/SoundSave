@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { importFromYandex, resolveUrl, searchTracks } from '../api'
 import { accent, bg, border, semantic, text } from '../theme'
+import { fmtDuration } from '../utils/format'
+import EmptyState from './EmptyState'
 
 const SC_URL = /soundcloud\.com\//i
 const YM_URL = /music\.yandex\.(ru|com)\/playlists\//i
-
-function fmt(sec) {
-  if (!sec) return ''
-  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
-}
 
 function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   const [hov, setHov] = useState(false)
@@ -105,7 +102,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
             transition: 'opacity 0.2s',
             opacity: hov ? 0 : 1,
           }}>
-            {fmt(track.duration)}
+            {fmtDuration(track.duration)}
           </div>
         )}
       </div>
@@ -196,7 +193,7 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
       setLoading(false)
       setLoadingMsg('')
     }
-  }, [])
+  }, [onOpenYandexAuth])
 
   const handleInput = (e) => {
     const val = e.target.value
@@ -235,8 +232,7 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
   }, [yandexConnected, doSearch])
 
   return (
-    <>
-      <div style={{ animation: 'fadeIn 0.2s ease' }}>
+    <div style={{ animation: 'fadeIn 0.2s ease' }}>
         {/* Search bar + Import button on same row */}
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 24 }}>
           <div style={{ position: 'relative', flex: 1 }}>
@@ -329,32 +325,14 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
 
         {/* Empty state — shown until results arrive, text adapts to query */}
         {!loading && results.length === 0 && !error && (
-          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
-            <div style={{
-              position: 'absolute', inset: 0,
-              backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-              backgroundSize: '28px 28px',
-              WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-              maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-              pointerEvents: 'none',
-            }} />
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative' }}>
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <div style={{ position: 'relative' }}>
-              {query.trim() ? (
-                <p style={{ fontSize: 15, color: text.muted, fontWeight: 500 }}>No results for "{query}"</p>
-              ) : (
-                <>
-                  <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Search for music</p>
-                  <p style={{ fontSize: 13, color: text.muted, opacity: 0.7, maxWidth: 320, lineHeight: 1.6 }}>Paste a SoundCloud or Yandex Music URL, or type a track or artist name</p>
-                </>
-              )}
-            </div>
-          </div>
+          <EmptyState
+            title={query.trim() ? `No results for "${query}"` : 'Search for music'}
+            subtitle={query.trim() ? null : 'Paste a SoundCloud or Yandex Music URL, or type a track or artist name'}
+          >
+            <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+          </EmptyState>
         )}
-      </div>
-    </>
+    </div>
   )
 }
 
