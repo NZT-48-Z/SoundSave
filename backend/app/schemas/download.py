@@ -10,6 +10,7 @@ class DownloadRequest(BaseModel):
     album: str | None = None
     genre: str | None = None
     artwork_url: str | None = None
+    artwork_local_path: str | None = None
 
 
 class BulkDownloadRequest(BaseModel):
