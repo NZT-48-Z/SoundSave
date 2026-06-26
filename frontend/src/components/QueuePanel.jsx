@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { startBulkDownload } from '../api'
 import { bg, border, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
+import CoverPickerModal from './CoverPickerModal'
 import { isModifiedTitle } from '../utils/trackModifiers'
 
 function fmt(sec) {
@@ -40,6 +41,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const [bulkGenre, setBulkGenre] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  const [coverPickerId, setCoverPickerId] = useState(null)
 
   const allSelected = queue.length > 0 && selected.size === queue.length
   const hasSelected = selected.size > 0
@@ -70,6 +72,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
         url: i.url, title: i.title, artist: i.artist,
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
+        artwork_local_path: i.artwork_local_path || null,
       }))
       const result = await startBulkDownload(items)
       onDownloaded(queue.map(i => i.id), result.ids || [])
@@ -225,6 +228,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
                 onUpdate={(field, val) => onUpdate(item.id, { [field]: val })}
                 onRemove={() => { onRemove(item.id); setSelected(prev => { const n = new Set(prev); n.delete(item.id); return n }); if (expandedId === item.id) setExpandedId(null) }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
+                onPickCover={() => setCoverPickerId(item.id)}
               />
               {expanded && modified && (
                 <AlternativesPanel
@@ -249,14 +253,29 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
       </div>
         </>
       )}
+
+      {coverPickerId && (() => {
+        const picked = queue.find(i => i.id === coverPickerId)
+        return picked ? (
+          <CoverPickerModal
+            item={picked}
+            onClose={() => setCoverPickerId(null)}
+            onConfirm={({ url, path }) => {
+              onUpdate(coverPickerId, { artwork_url: url, artwork_local_path: path })
+              setCoverPickerId(null)
+            }}
+          />
+        ) : null
+      })()}
     </div>
   )
 }
 
-function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives }) {
+function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
+  const [thumbHov, setThumbHov] = useState(false)
   return (
     <div
       onMouseEnter={() => setRowHov(true)}
@@ -275,11 +294,17 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <input type="checkbox" checked={isSelected} onChange={onToggle} style={{ width: 15, height: 15 }} />
       </div>
-      <div style={{
-        width: 40, height: 40, borderRadius: 6,
-        background: item.color || '#18181b',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden',
-      }}>
+      <div
+        onClick={onPickCover}
+        onMouseEnter={() => setThumbHov(true)}
+        onMouseLeave={() => setThumbHov(false)}
+        style={{
+          width: 40, height: 40, borderRadius: 6,
+          background: item.color || '#18181b',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          overflow: 'hidden', cursor: 'pointer', position: 'relative',
+        }}
+      >
         {item.artwork_url ? (
           <img src={item.artwork_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
@@ -288,6 +313,18 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
             <circle cx="6" cy="18" r="3"/>
             <circle cx="18" cy="16" r="3"/>
           </svg>
+        )}
+        {thumbHov && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0,0,0,0.58)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
         )}
       </div>
 
