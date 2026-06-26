@@ -1,4 +1,4 @@
-import { bg, border, text } from '../theme'
+import { bg, border, neutral, semantic, text } from '../theme'
 import CloseBtn from './CloseBtn'
 
 export default function DownloadReportModal({ report, onClose }) {
@@ -36,11 +36,11 @@ export default function DownloadReportModal({ report, onClose }) {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {allOk ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={semantic.success} strokeWidth="2.5" strokeLinecap="round">
                     <polyline points="20 6 9 17 4 12"/>
                   </svg>
                 ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2.5" strokeLinecap="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={semantic.warning} strokeWidth="2.5" strokeLinecap="round">
                     <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
                     <line x1="12" y1="9" x2="12" y2="13"/>
                     <line x1="12" y1="17" x2="12.01" y2="17"/>
@@ -51,7 +51,7 @@ export default function DownloadReportModal({ report, onClose }) {
                 <h2 style={{ fontWeight: 700, fontSize: 16, color: text.primary, margin: 0, lineHeight: 1.2 }}>
                   {allOk ? 'All downloads complete' : 'Downloads finished'}
                 </h2>
-                <p style={{ fontSize: 13, color: '#71717a', margin: '4px 0 0' }}>
+                <p style={{ fontSize: 13, color: neutral[500], margin: '4px 0 0' }}>
                   {done.length} of {total} track{total !== 1 ? 's' : ''} downloaded successfully
                 </p>
               </div>
@@ -61,11 +61,11 @@ export default function DownloadReportModal({ report, onClose }) {
 
           {/* Stats */}
           <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-            <StatBox value={done.length} label="Downloaded" color="#22c55e" bg="rgba(34,197,94,0.08)" />
+            <StatBox value={done.length} label="Downloaded" color={semantic.success} bg="rgba(34,197,94,0.08)" />
             {errors.length > 0 && (
-              <StatBox value={errors.length} label="Failed" color="#ef4444" bg="rgba(239,68,68,0.08)" />
+              <StatBox value={errors.length} label="Failed" color={semantic.error} bg={semantic.errorBg} />
             )}
-            <StatBox value={total} label="Total" color="#71717a" bg="rgba(255,255,255,0.04)" />
+            <StatBox value={total} label="Total" color={neutral[500]} bg="rgba(255,255,255,0.04)" />
           </div>
         </div>
 
@@ -74,7 +74,7 @@ export default function DownloadReportModal({ report, onClose }) {
 
           {errors.length > 0 && (
             <>
-              <SectionLabel color="#ef4444">
+              <SectionLabel color={semantic.error}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
@@ -86,7 +86,7 @@ export default function DownloadReportModal({ report, onClose }) {
 
           {done.length > 0 && (
             <>
-              <SectionLabel color="#22c55e">
+              <SectionLabel color={semantic.success}>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <polyline points="20 6 9 17 4 12"/>
                 </svg>
@@ -108,8 +108,8 @@ export default function DownloadReportModal({ report, onClose }) {
               cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
               transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#eeeef2' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9898a6' }}
+            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = text.primary }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = text.secondary }}
           >
             Close
           </button>
@@ -132,11 +132,11 @@ function TrackRow({ dl, isError }) {
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {isError ? (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2.5" strokeLinecap="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={semantic.error} strokeWidth="2.5" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         ) : (
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2.5" strokeLinecap="round">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke={semantic.success} strokeWidth="2.5" strokeLinecap="round">
             <polyline points="20 6 9 17 4 12"/>
           </svg>
         )}
@@ -144,7 +144,7 @@ function TrackRow({ dl, isError }) {
 
       <div style={{
         width: 34, height: 34, borderRadius: 5, flexShrink: 0, overflow: 'hidden',
-        background: dl.color || '#27272a',
+        background: dl.color || neutral[800],
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {dl.artwork_url ? (
@@ -160,10 +160,10 @@ function TrackRow({ dl, isError }) {
         <div style={{ fontSize: 13, fontWeight: 500, color: text.primary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {dl.title}
         </div>
-        <div style={{ fontSize: 11, color: '#71717a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        <div style={{ fontSize: 11, color: neutral[500], whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
           {dl.artist}
           {isError && dl.error && (
-            <span style={{ color: '#ef4444', marginLeft: 6 }}>— {dl.error}</span>
+            <span style={{ color: semantic.error, marginLeft: 6 }}>— {dl.error}</span>
           )}
         </div>
       </div>
@@ -175,7 +175,7 @@ function StatBox({ value, label, color, bg }) {
   return (
     <div style={{ flex: 1, padding: '8px 12px', background: bg, borderRadius: 8 }}>
       <div style={{ fontSize: 20, fontWeight: 700, color, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>{value}</div>
-      <div style={{ fontSize: 11, color: '#52525b', textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{label}</div>
+      <div style={{ fontSize: 11, color: neutral[600], textTransform: 'uppercase', letterSpacing: '0.06em', marginTop: 2 }}>{label}</div>
     </div>
   )
 }
