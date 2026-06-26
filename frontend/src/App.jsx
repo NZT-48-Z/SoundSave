@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { clearHistory, getDownloads, getYandexAuthStatus } from './api'
+import { clearHistory, getDownloads, getPreviewUrl, getYandexAuthStatus } from './api'
 import { accent, bg, border, semantic, text } from './theme'
 import DownloadReportModal from './components/DownloadReportModal'
 import DownloadsPanel from './components/DownloadsPanel'
+import MiniPlayer from './components/MiniPlayer'
 import QueuePanel from './components/QueuePanel'
 import SearchPanel from './components/SearchPanel'
 import ImportTracklistModal from './components/ImportTracklistModal'
@@ -48,10 +49,31 @@ export default function App() {
   const [batchReport, setBatchReport] = useState(null) // {done: [], errors: []}
   const [showYandexModal, setShowYandexModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [currentPreview, setCurrentPreview] = useState(null) // { trackId, title, artist, artwork_url, duration }
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const pollRef = useRef(null)
+  const audioRef = useRef(new Audio())
 
   useEffect(() => {
     getYandexAuthStatus().then(s => setYandexConnected(!!s.connected))
+  }, [])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    const onPlay = () => setIsPreviewPlaying(true)
+    const onPause = () => setIsPreviewPlaying(false)
+    const onEnded = () => setIsPreviewPlaying(false)
+    audio.addEventListener('play', onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('play', onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.pause()
+      audio.src = ''
+    }
   }, [])
 
   useEffect(() => {
@@ -136,6 +158,41 @@ export default function App() {
 
   const openYandexModal = useCallback(() => setShowYandexModal(true), [])
   const openImportModal = useCallback(() => setShowImportModal(true), [])
+
+  const handlePreview = useCallback(async (track) => {
+    const audio = audioRef.current
+    if (currentPreview?.trackId === track.id) {
+      audio.paused ? audio.play() : audio.pause()
+      return
+    }
+    audio.pause()
+    setCurrentPreview({ trackId: track.id, title: track.title, artist: track.artist, artwork_url: track.artwork_url || null, duration: track.duration || 0 })
+    setPreviewLoading(true)
+    setIsPreviewPlaying(false)
+    try {
+      const { stream_url } = await getPreviewUrl(track.url)
+      audio.src = stream_url
+      audio.load()
+      await audio.play()
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Preview failed:', err)
+        showToast('Preview not available', 'error')
+        setCurrentPreview(null)
+        audio.src = ''
+      }
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [currentPreview, showToast])
+
+  const handleClosePreview = useCallback(() => {
+    const audio = audioRef.current
+    audio.pause()
+    audio.src = ''
+    setCurrentPreview(null)
+    setIsPreviewPlaying(false)
+  }, [])
 
   const onClearHistory = useCallback(async () => {
     await clearHistory()
@@ -290,7 +347,7 @@ export default function App() {
       </nav>
 
       {/* MAIN */}
-      <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: '28px 24px', width: '100%' }}>
+      <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: `28px 24px ${currentPreview ? 96 : 28}px`, width: '100%' }}>
         <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
           <SearchPanel
             queue={queue}
@@ -301,6 +358,10 @@ export default function App() {
             onYandexConnected={handleYandexAuthSuccess}
             onOpenYandexAuth={openYandexModal}
             onOpenImport={openImportModal}
+            onPreview={handlePreview}
+            previewTrackId={currentPreview?.trackId ?? null}
+            isPreviewPlaying={isPreviewPlaying}
+            previewLoading={previewLoading}
           />
         </div>
         {activeTab === 'queue' && (
@@ -312,6 +373,10 @@ export default function App() {
               onClear={clearQueue}
               onDownloaded={onDownloaded}
               showToast={showToast}
+              onPreview={handlePreview}
+              previewTrackId={currentPreview?.trackId ?? null}
+              isPreviewPlaying={isPreviewPlaying}
+              previewLoading={previewLoading}
             />
           </div>
         )}
@@ -340,6 +405,14 @@ export default function App() {
         <DownloadReportModal
           report={batchReport}
           onClose={() => setBatchReport(null)}
+        />
+      )}
+      {currentPreview && (
+        <MiniPlayer
+          track={currentPreview}
+          audioRef={audioRef}
+          loading={previewLoading}
+          onClose={handleClosePreview}
         />
       )}
       <Toast toasts={toasts} />
