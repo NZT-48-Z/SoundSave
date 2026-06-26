@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { uploadCover } from '../api'
-import { bg, border, text, accent } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
 
 export default function CoverPickerModal({ item, onClose, onConfirm }) {
   const [preview, setPreview] = useState(null)
@@ -125,7 +125,7 @@ export default function CoverPickerModal({ item, onClose, onConfirm }) {
         </div>
 
         {error && (
-          <span style={{ fontSize: 12, color: '#ef4444', textAlign: 'center' }}>{error}</span>
+          <span style={{ fontSize: 12, color: semantic.error, textAlign: 'center' }}>{error}</span>
         )}
 
         {/* Actions */}
@@ -173,7 +173,7 @@ function CoverThumb({ src, label, highlight, onClick }) {
         onMouseLeave={() => setHov(false)}
         style={{
           width: 88, height: 88, borderRadius: 8,
-          background: '#18181b', overflow: 'hidden',
+          background: neutral[900], overflow: 'hidden',
           border: `1px solid ${hov ? accent[500] : highlight ? 'rgba(249,115,22,0.3)' : border.default}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: onClick ? 'pointer' : 'default',
