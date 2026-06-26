@@ -4,6 +4,7 @@ export const bg = {
   page:    '#09090b',   // page background
   surface: '#141418',   // cards, panels — elevated (+7.5% lightness vs page)
   overlay: '#1e1e24',   // modals, dropdowns — highest elevation
+  dot:     '#2e2e32',   // 1px dots in the empty-state decorative grid
 }
 
 // Borders — white-alpha adapts to any surface automatically
@@ -21,13 +22,26 @@ export const text = {
   muted:     '#56566a',   // ~36% — hints, placeholders, disabled
 }
 
-// Layer 2 – accent ramp (orange, 400→700)
+// Layer 2 – accent ramp (orange, 400→800)
 export const accent = {
   subtle: 'rgba(249,115,22,0.08)',
   400:    '#fb923c',   // light — links, secondary indicators
   500:    '#f97316',   // primary
   600:    '#e8640f',   // hover
   700:    '#c2410c',   // active / pressed
+  800:    '#7c3010',   // disabled / loading state
+}
+
+// Neutral zinc scale — the UI's structural grey palette
+export const neutral = {
+  50:  '#fafafa',   // near-white — strong hover text
+  300: '#d4d4d8',   // light labels (e.g. duration badges)
+  400: '#a1a1aa',   // secondary labels, artist names
+  500: '#71717a',   // muted text, inactive icons
+  600: '#52525b',   // very muted, delete icon default
+  700: '#3f3f46',   // focused/hover borders, scrollbar thumb
+  800: '#27272a',   // default borders on dark surfaces
+  900: '#18181b',   // thumbnail / input focused background
 }
 
 // Layer 3 – semantic colors (always mean the same thing)
