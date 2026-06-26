@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { importFromYandex, resolveUrl, searchTracks } from '../api'
-import { accent, bg, border, semantic, text } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtDuration } from '../utils/format'
 import EmptyState from './EmptyState'
 
@@ -28,7 +28,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
       onClick={() => isAdded ? onRemove() : onAdd()}
     >
       {/* Artwork */}
-      <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || '#18181b' }}>
+      <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || neutral[900] }}>
         {track.artwork_url ? (
           <img
             src={track.artwork_url}
@@ -98,7 +98,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
             position: 'absolute', bottom: 7, right: 7,
             background: 'rgba(0,0,0,0.62)', backdropFilter: 'blur(4px)',
             borderRadius: 4, padding: '2px 6px', fontSize: 11,
-            color: '#d4d4d8', fontFamily: "'JetBrains Mono', monospace",
+            color: neutral[300], fontFamily: "'JetBrains Mono', monospace",
             transition: 'opacity 0.2s',
             opacity: hov ? 0 : 1,
           }}>
