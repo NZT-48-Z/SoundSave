@@ -19,7 +19,7 @@ async def search(
     page: int = Query(1, ge=1),
     per_page: int = Query(20, ge=1, le=50),
 ):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     offset = (page - 1) * per_page
     try:
         results = await loop.run_in_executor(
@@ -44,7 +44,7 @@ async def alternatives(
     artist: str = Query(""),
     limit: int = Query(5, ge=1, le=10),
 ):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         results = await loop.run_in_executor(
             _executor, search_alternatives, title, artist, limit
@@ -62,7 +62,7 @@ async def alternatives(
 
 @router.post("/import/batch")
 async def import_batch(req: BatchImportRequest):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     sem = asyncio.Semaphore(4)
 
     async def resolve_one(item) -> BatchImportResultItem:
@@ -91,7 +91,7 @@ async def import_batch(req: BatchImportRequest):
 
 @router.get("/resolve")
 async def resolve(url: str = Query(...)):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         result = await loop.run_in_executor(_executor, resolve_url, url)
         return result

@@ -4,11 +4,46 @@ import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtDuration } from '../utils/format'
 import EmptyState from './EmptyState'
 
+function PreviewBtn({ isActive, isPlaying, isLoading, onClick }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      title="Preview"
+      style={{
+        position: 'absolute', bottom: 7, left: 7, zIndex: 3,
+        width: 26, height: 26, borderRadius: '50%',
+        background: isActive ? accent[500] : 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(4px)',
+        border: `1px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.15)'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: 'white', padding: 0,
+        transition: 'background 0.15s',
+      }}
+    >
+      {isActive && isLoading ? (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+      ) : isActive && isPlaying ? (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+          <rect x="5" y="4" width="4" height="16" rx="1"/>
+          <rect x="15" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      ) : (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+          <polygon points="5 3 19 12 5 21"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
 const SC_URL = /soundcloud\.com\//i
 const YM_URL = /music\.yandex\.(ru|com)\/playlists\//i
 
-function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
+function TrackCard({ track, isAdded, onAdd, onRemove, index, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [hov, setHov] = useState(false)
+  const isActive = previewTrackId === track.id
 
   return (
     <div
@@ -105,6 +140,15 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
             {fmtDuration(track.duration)}
           </div>
         )}
+
+        {(hov || isActive) && (
+          <PreviewBtn
+            isActive={isActive}
+            isPlaying={isPreviewPlaying}
+            isLoading={previewLoading}
+            onClick={() => onPreview(track)}
+          />
+        )}
       </div>
 
       {/* Info */}
@@ -131,7 +175,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   )
 }
 
-export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
+export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -143,11 +187,13 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
   const pendingYandexUrl = useRef(null)
   const debounce = useRef(null)
   const currentQuery = useRef('')
+  const searchId = useRef(0)
 
   const PAGE_SIZE = 20
 
   const doSearch = useCallback(async (q, p = 1) => {
     if (!q.trim()) { setResults([]); setImportStats(null); setPage(1); setHasMore(false); return }
+    const id = ++searchId.current
     setLoading(true)
     setError('')
     if (p === 1) setImportStats(null)
@@ -185,13 +231,12 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
         setHasMore(res.has_more)
         setPage(p)
       }
-      setResults(tracks)
+      if (id === searchId.current) setResults(tracks)
     } catch {
-      setError('Failed. Check the URL or try again.')
-      setResults([])
+      if (id === searchId.current) setError('Failed. Check the URL or try again.')
+      if (id === searchId.current) setResults([])
     } finally {
-      setLoading(false)
-      setLoadingMsg('')
+      if (id === searchId.current) { setLoading(false); setLoadingMsg('') }
     }
   }, [onOpenYandexAuth])
 
@@ -201,6 +246,19 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
     setPage(1)
     clearTimeout(debounce.current)
     debounce.current = setTimeout(() => doSearch(val, 1), 500)
+  }
+
+  const handleClear = () => {
+    ++searchId.current
+    setQuery('')
+    setResults([])
+    setPage(1)
+    setHasMore(false)
+    setError('')
+    setLoading(false)
+    setLoadingMsg('')
+    setImportStats(null)
+    clearTimeout(debounce.current)
   }
 
   const handleAdd = (track) => {
@@ -242,6 +300,23 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
               </svg>
             </div>
             <SearchInput value={query} onChange={handleInput} loading={loading} />
+            {query && (
+              <button
+                onClick={handleClear}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: text.muted, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 4, borderRadius: 4, transition: 'color 0.12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = text.secondary}
+                onMouseLeave={e => e.currentTarget.style.color = text.muted}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
           </div>
           <ImportListBtn onClick={onOpenImport} />
         </div>
@@ -314,6 +389,10 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
                   isAdded={isInQueue(track.id)}
                   onAdd={() => handleAdd(track)}
                   onRemove={() => handleRemove(track)}
+                  onPreview={onPreview}
+                  previewTrackId={previewTrackId}
+                  isPreviewPlaying={isPreviewPlaying}
+                  previewLoading={previewLoading}
                 />
               ))}
             </div>

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { clearHistory, getDownloads, getYandexAuthStatus } from './api'
+import { clearHistory, getDownloads, getPreviewUrl, getYandexAuthStatus } from './api'
 import { accent, bg, border, semantic, text } from './theme'
 import DownloadReportModal from './components/DownloadReportModal'
 import DownloadsPanel from './components/DownloadsPanel'
+import MiniPlayer from './components/MiniPlayer'
 import QueuePanel from './components/QueuePanel'
 import SearchPanel from './components/SearchPanel'
 import ImportTracklistModal from './components/ImportTracklistModal'
@@ -16,7 +17,7 @@ function trackColor(id) {
   return palette[n % palette.length]
 }
 
-function Toast({ toasts }) {
+function Toast({ toasts, onDismiss }) {
   if (!toasts.length) return null
   return (
     <div style={{ position: 'fixed', top: 64, right: 20, zIndex: 400, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
@@ -26,12 +27,30 @@ function Toast({ toasts }) {
           padding: '10px 14px', fontSize: 13, color: text.primary,
           display: 'flex', alignItems: 'center', gap: 9,
           animation: 'toastIn 0.2s ease', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
-          maxWidth: 300, pointerEvents: 'all',
+          maxWidth: 320, pointerEvents: 'all',
         }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || semantic.success} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
-            <polyline points="20 6 9 17 4 12"/>
+            {t.type === 'error' ? (
+              <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+            ) : t.type === 'warning' ? (
+              <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
+            ) : (
+              <polyline points="20 6 9 17 4 12"/>
+            )}
           </svg>
-          <span style={{ lineHeight: 1.4 }}>{t.msg}</span>
+          <span style={{ lineHeight: 1.4, flex: 1 }}>{t.msg}</span>
+          {t.action && (
+            <button
+              onClick={() => { t.action.fn(); onDismiss(t.id) }}
+              style={{
+                padding: '3px 8px', background: 'transparent',
+                border: `1px solid ${border.strong}`, borderRadius: 5,
+                color: text.secondary, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >{t.action.label}</button>
+          )}
         </div>
       ))}
     </div>
@@ -48,10 +67,31 @@ export default function App() {
   const [batchReport, setBatchReport] = useState(null) // {done: [], errors: []}
   const [showYandexModal, setShowYandexModal] = useState(false)
   const [showImportModal, setShowImportModal] = useState(false)
+  const [currentPreview, setCurrentPreview] = useState(null) // { trackId, title, artist, artwork_url, duration }
+  const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
+  const [previewLoading, setPreviewLoading] = useState(false)
   const pollRef = useRef(null)
+  const audioRef = useRef(new Audio())
 
   useEffect(() => {
     getYandexAuthStatus().then(s => setYandexConnected(!!s.connected))
+  }, [])
+
+  useEffect(() => {
+    const audio = audioRef.current
+    const onPlay = () => setIsPreviewPlaying(true)
+    const onPause = () => setIsPreviewPlaying(false)
+    const onEnded = () => setIsPreviewPlaying(false)
+    audio.addEventListener('play', onPlay)
+    audio.addEventListener('pause', onPause)
+    audio.addEventListener('ended', onEnded)
+    return () => {
+      audio.removeEventListener('play', onPlay)
+      audio.removeEventListener('pause', onPause)
+      audio.removeEventListener('ended', onEnded)
+      audio.pause()
+      audio.src = ''
+    }
   }, [])
 
   useEffect(() => {
@@ -78,11 +118,11 @@ export default function App() {
     }
   }, [downloads, activeBatch])
 
-  const showToast = useCallback((msg, type = 'success') => {
+  const showToast = useCallback((msg, type = 'success', action = null) => {
     const id = Date.now() + Math.random()
-    const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error }[type] || semantic.success
-    setToasts(prev => [...prev, { id, msg, iconColor }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2600)
+    const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error, warning: semantic.warning }[type] || semantic.success
+    setToasts(prev => [...prev, { id, msg, type, iconColor, action }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), action ? 4000 : 2600)
   }, [])
 
   const addToQueue = useCallback((track) => {
@@ -132,10 +172,75 @@ export default function App() {
     setQueue(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
   }, [])
 
-  const clearQueue = useCallback(() => setQueue([]), [])
+  const reorderQueue = useCallback((from, to) => {
+    setQueue(prev => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }, [])
+
+  const clearQueue = useCallback(() => {
+    const saved = queue.slice()
+    setQueue([])
+    showToast(`${saved.length} tracks cleared`, 'warning', {
+      label: 'Undo',
+      fn: () => setQueue(prev => [...saved, ...prev.filter(t => !saved.find(s => s.id === t.id))]),
+    })
+  }, [queue, showToast])
 
   const openYandexModal = useCallback(() => setShowYandexModal(true), [])
   const openImportModal = useCallback(() => setShowImportModal(true), [])
+
+  const handlePreview = useCallback(async (track) => {
+    const audio = audioRef.current
+    if (currentPreview?.trackId === track.id) {
+      audio.paused ? audio.play() : audio.pause()
+      return
+    }
+    audio.pause()
+    setCurrentPreview({ trackId: track.id, title: track.title, artist: track.artist, artwork_url: track.artwork_url || null, duration: track.duration || 0 })
+    setPreviewLoading(true)
+    setIsPreviewPlaying(false)
+    try {
+      const { stream_url } = await getPreviewUrl(track.url)
+      audio.src = stream_url
+      audio.load()
+      await audio.play()
+    } catch (err) {
+      if (err?.name !== 'AbortError') {
+        console.error('Preview failed:', err)
+        showToast('Preview not available', 'error')
+        setCurrentPreview(null)
+        audio.src = ''
+      }
+    } finally {
+      setPreviewLoading(false)
+    }
+  }, [currentPreview, showToast])
+
+  const handleClosePreview = useCallback(() => {
+    const audio = audioRef.current
+    audio.pause()
+    audio.src = ''
+    setCurrentPreview(null)
+    setIsPreviewPlaying(false)
+  }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.code !== 'Space') return
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+      e.preventDefault()
+      if (!currentPreview) return
+      const audio = audioRef.current
+      audio.paused ? audio.play() : audio.pause()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [currentPreview])
 
   const onClearHistory = useCallback(async () => {
     await clearHistory()
@@ -290,7 +395,7 @@ export default function App() {
       </nav>
 
       {/* MAIN */}
-      <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: '28px 24px', width: '100%' }}>
+      <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: `28px 24px ${currentPreview ? 96 : 28}px`, width: '100%' }}>
         <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
           <SearchPanel
             queue={queue}
@@ -301,6 +406,10 @@ export default function App() {
             onYandexConnected={handleYandexAuthSuccess}
             onOpenYandexAuth={openYandexModal}
             onOpenImport={openImportModal}
+            onPreview={handlePreview}
+            previewTrackId={currentPreview?.trackId ?? null}
+            isPreviewPlaying={isPreviewPlaying}
+            previewLoading={previewLoading}
           />
         </div>
         {activeTab === 'queue' && (
@@ -310,8 +419,13 @@ export default function App() {
               onRemove={removeFromQueue}
               onUpdate={updateQueueItem}
               onClear={clearQueue}
+              onReorder={reorderQueue}
               onDownloaded={onDownloaded}
               showToast={showToast}
+              onPreview={handlePreview}
+              previewTrackId={currentPreview?.trackId ?? null}
+              isPreviewPlaying={isPreviewPlaying}
+              previewLoading={previewLoading}
             />
           </div>
         )}
@@ -342,7 +456,15 @@ export default function App() {
           onClose={() => setBatchReport(null)}
         />
       )}
-      <Toast toasts={toasts} />
+      {currentPreview && (
+        <MiniPlayer
+          track={currentPreview}
+          audioRef={audioRef}
+          loading={previewLoading}
+          onClose={handleClosePreview}
+        />
+      )}
+      <Toast toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
     </div>
   )
 }

@@ -94,6 +94,12 @@ export async function clearHistory() {
   return r.json()
 }
 
+export async function getPreviewUrl(url) {
+  const r = await fetch(`${BASE}/preview?url=${encodeURIComponent(url)}`)
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() // { stream_url, duration }
+}
+
 export async function uploadCover(file) {
   const form = new FormData()
   form.append('file', file)

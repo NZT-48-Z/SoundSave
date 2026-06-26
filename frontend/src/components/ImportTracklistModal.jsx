@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { importBatch } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
 import CloseBtn from './CloseBtn'
@@ -59,6 +59,12 @@ export default function ImportTracklistModal({ onClose, onBatchAdd }) {
   const [phase, setPhase] = useState('idle') // idle | resolving | done | error
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [summary, setSummary] = useState(null) // { added, skipped }
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape' && phase !== 'resolving') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose, phase])
 
   const items = parseInput(rawText)
   const directCount = items.filter(i => i.kind === 'direct').length

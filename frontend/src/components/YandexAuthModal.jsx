@@ -46,6 +46,12 @@ export default function YandexAuthModal({ onSuccess, onClose, onDisconnect, isCo
     return () => { cancelRef.current = true; clearTimeout(pollRef.current) }
   }, [isConnected, onSuccess])
 
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
+
   const handleDisconnect = async () => {
     setDisconnecting(true)
     try {

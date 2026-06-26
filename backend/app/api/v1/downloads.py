@@ -53,7 +53,7 @@ async def cancel_download(download_id: str, db: DbSession):
 
 @router.delete("/downloads")
 async def clear_history(db: DbSession):
-    _CLEAR_STATUSES = {"done", "error", "cancelled", "downloading", "converting", "tagging"}
+    _CLEAR_STATUSES = {"done", "error", "cancelled"}
     result = await db.execute(
         select(Download.artwork_url).where(Download.status.in_(_CLEAR_STATUSES))
     )

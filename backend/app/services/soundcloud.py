@@ -86,6 +86,45 @@ def search_tracks(query: str, limit: int = 20, offset: int = 0) -> list[dict]:
         raise SoundCloudError(str(e)) from e
 
 
+_YDL_PREVIEW_OPTS = {
+    "quiet": True,
+    "no_warnings": True,
+    # Explicitly exclude HLS/DASH — browsers can't play them natively via Audio API.
+    # http_mp3_128k is SoundCloud's progressive MP3; fallbacks require direct HTTP(S).
+    "format": "http_mp3_128k/bestaudio[ext=mp3][protocol=https]/bestaudio[protocol=https]/bestaudio[protocol=http]",
+}
+
+
+def get_preview_url(url: str) -> dict:
+    try:
+        with yt_dlp.YoutubeDL(_YDL_PREVIEW_OPTS) as ydl:
+            result = ydl.extract_info(url, download=False)
+            if not result:
+                raise SoundCloudError("Could not resolve track")
+
+            stream_url = result.get("url")
+
+            if not stream_url:
+                formats = result.get("formats") or []
+                for fmt in reversed(formats):
+                    if fmt.get("protocol") in ("https", "http") and fmt.get("vcodec") in (None, "none"):
+                        stream_url = fmt.get("url")
+                        break
+                if not stream_url and formats:
+                    stream_url = formats[-1].get("url")
+
+            if not stream_url:
+                raise SoundCloudError("No stream URL available")
+
+            return {"stream_url": stream_url, "duration": result.get("duration")}
+
+    except SoundCloudError:
+        raise
+    except Exception as e:
+        logger.error("Preview fetch failed: %s", e)
+        raise SoundCloudError(str(e)) from e
+
+
 def resolve_url(url: str) -> dict:
     try:
         with yt_dlp.YoutubeDL(_YDL_BASE_OPTS) as ydl:
