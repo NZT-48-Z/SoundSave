@@ -1,5 +1,6 @@
 import logging
 import os
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException
 from sqlalchemy import select
@@ -17,9 +18,10 @@ logger = logging.getLogger(__name__)
 
 @router.post("/download/bulk")
 async def bulk_download(req: BulkDownloadRequest):
+    batch_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     ids = []
     for item in req.items:
-        dl_id = await download_queue.enqueue(item)
+        dl_id = await download_queue.enqueue(item, batch_dir)
         ids.append(dl_id)
     return {"ids": ids, "count": len(ids)}
 
