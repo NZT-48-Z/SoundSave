@@ -10,13 +10,14 @@ function fmt(sec) {
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
 }
 
-function TrackCard({ track, isAdded, onAdd, index }) {
+function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   const [hov, setHov] = useState(false)
+
   return (
     <div
       style={{
         background: bg.surface,
-        border: `1px solid ${hov ? (isAdded ? border.strong : border.accent) : border.default}`,
+        border: `1px solid ${hov ? (isAdded ? 'rgba(239,68,68,0.45)' : border.accent) : border.default}`,
         borderRadius: 10, overflow: 'hidden',
         transition: 'border-color 0.2s, transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s',
         transform: hov ? 'translateY(-2px)' : 'translateY(0)',
@@ -27,7 +28,7 @@ function TrackCard({ track, isAdded, onAdd, index }) {
       }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      onClick={() => !isAdded && onAdd()}
+      onClick={() => isAdded ? onRemove() : onAdd()}
     >
       {/* Artwork */}
       <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || '#18181b' }}>
@@ -64,12 +65,21 @@ function TrackCard({ track, isAdded, onAdd, index }) {
           {isAdded ? (
             <div style={{
               width: 38, height: 38, borderRadius: '50%',
-              background: 'rgba(34,197,94,0.85)',
+              background: hov ? 'rgba(239,68,68,0.88)' : 'rgba(34,197,94,0.85)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.18s',
+              boxShadow: hov ? '0 4px 16px rgba(239,68,68,0.45)' : 'none',
             }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              {hov ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
             </div>
           ) : hov && (
             <div style={{
@@ -105,11 +115,18 @@ function TrackCard({ track, isAdded, onAdd, index }) {
         <div style={{ fontWeight: 600, fontSize: 13, color: text.primary, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</div>
         <div style={{ fontSize: 12, color: hov ? text.secondary : text.muted, marginBottom: isAdded ? 8 : 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.artist}</div>
         {isAdded && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: semantic.success, fontSize: 11, fontWeight: 500 }}>
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <polyline points="20 6 9 17 4 12"/>
-            </svg>
-            Added to queue
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: hov ? 'rgba(239,68,68,0.9)' : semantic.success, fontSize: 11, fontWeight: 500, transition: 'color 0.18s' }}>
+            {hov ? (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            )}
+            {hov ? 'Remove from queue' : 'Added to queue'}
           </div>
         )}
       </div>
@@ -117,7 +134,7 @@ function TrackCard({ track, isAdded, onAdd, index }) {
   )
 }
 
-export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
+export default function SearchPanel({ onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -193,6 +210,11 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
   const handleAdd = (track) => {
     onAddToQueue(track)
     setAdded(prev => new Set(prev).add(track.id))
+  }
+
+  const handleRemove = (track) => {
+    onRemoveFromQueue(track.id)
+    setAdded(prev => { const s = new Set(prev); s.delete(track.id); return s })
   }
 
   const handleAddAll = () => {
@@ -297,6 +319,7 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
                   index={index}
                   isAdded={added.has(track.id)}
                   onAdd={() => handleAdd(track)}
+                  onRemove={() => handleRemove(track)}
                 />
               ))}
             </div>
