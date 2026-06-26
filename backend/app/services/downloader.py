@@ -59,7 +59,16 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
         if meta.genre:
             tags["TCON"] = TCON(encoding=3, text=meta.genre)
 
-        if meta.artwork_url:
+        if meta.artwork_local_path and os.path.exists(meta.artwork_local_path):
+            try:
+                with open(meta.artwork_local_path, "rb") as fh:
+                    art_data = fh.read()
+                _ext = os.path.splitext(meta.artwork_local_path)[1].lower().lstrip(".")
+                _mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(_ext, "image/jpeg")
+                tags["APIC"] = APIC(encoding=3, mime=_mime, type=3, desc="Cover", data=art_data)
+            except Exception as e:
+                logger.warning("Could not read local artwork: %s", e)
+        elif meta.artwork_url:
             try:
                 with httpx.Client(timeout=15) as client:
                     r = client.get(meta.artwork_url)

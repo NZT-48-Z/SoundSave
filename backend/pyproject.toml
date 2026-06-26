@@ -15,6 +15,7 @@ dependencies = [
     "static-ffmpeg>=2.5.0",
     "yandex-music>=3.0.0",
     "keyring>=25.0.0",
+    "python-multipart>=0.0.32",
 ]
 
 [tool.pytest.ini_options]

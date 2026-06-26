@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { startBulkDownload } from '../api'
 import { bg, border, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
+import CoverPickerModal from './CoverPickerModal'
 import { isModifiedTitle } from '../utils/trackModifiers'
 
 function fmt(sec) {
@@ -40,6 +41,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const [bulkGenre, setBulkGenre] = useState('')
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
+  const [coverPickerId, setCoverPickerId] = useState(null)
 
   const allSelected = queue.length > 0 && selected.size === queue.length
   const hasSelected = selected.size > 0
@@ -70,6 +72,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
         url: i.url, title: i.title, artist: i.artist,
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
+        artwork_local_path: i.artwork_local_path || null,
       }))
       const result = await startBulkDownload(items)
       onDownloaded(queue.map(i => i.id), result.ids || [])
@@ -89,33 +92,31 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const queueTotalMins = Math.floor(queueTotalSecs / 60)
   const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
 
-  if (!queue.length) {
-    return (
-      <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', animation: 'fadeIn 0.2s ease', overflow: 'hidden' }}>
-        <div style={{
-          position: 'absolute', inset: 0,
-          backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-          backgroundSize: '28px 28px',
-          WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-          maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-          pointerEvents: 'none',
-        }} />
-        <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
-          <line x1="21" y1="10" x2="7" y2="10"/>
-          <line x1="21" y1="6" x2="3" y2="6"/>
-          <line x1="21" y1="14" x2="7" y2="14"/>
-          <line x1="21" y1="18" x2="3" y2="18"/>
-        </svg>
-        <div style={{ position: 'relative' }}>
-          <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
-          <p style={{ fontSize: 13, color: '#3f3f46' }}>Add tracks from Search to build your download queue</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
+      {!queue.length ? (
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
+          <div style={{
+            position: 'absolute', inset: 0,
+            backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
+            backgroundSize: '28px 28px',
+            WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+            maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+            pointerEvents: 'none',
+          }} />
+          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
+            <line x1="21" y1="10" x2="7" y2="10"/>
+            <line x1="21" y1="6" x2="3" y2="6"/>
+            <line x1="21" y1="14" x2="7" y2="14"/>
+            <line x1="21" y1="18" x2="3" y2="18"/>
+          </svg>
+          <div style={{ position: 'relative' }}>
+            <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
+            <p style={{ fontSize: 13, color: text.muted, opacity: 0.7 }}>Add tracks from Search to build your download queue</p>
+          </div>
+        </div>
+      ) : (
+        <>
       {/* Toolbar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, gap: 12, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -227,6 +228,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
                 onUpdate={(field, val) => onUpdate(item.id, { [field]: val })}
                 onRemove={() => { onRemove(item.id); setSelected(prev => { const n = new Set(prev); n.delete(item.id); return n }); if (expandedId === item.id) setExpandedId(null) }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
+                onPickCover={() => setCoverPickerId(item.id)}
               />
               {expanded && modified && (
                 <AlternativesPanel
@@ -249,32 +251,60 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
           )
         })}
       </div>
+        </>
+      )}
+
+      {coverPickerId && (() => {
+        const picked = queue.find(i => i.id === coverPickerId)
+        return picked ? (
+          <CoverPickerModal
+            item={picked}
+            onClose={() => setCoverPickerId(null)}
+            onConfirm={({ url, path }) => {
+              onUpdate(coverPickerId, { artwork_url: url, artwork_local_path: path })
+              setCoverPickerId(null)
+            }}
+          />
+        ) : null
+      })()}
     </div>
   )
 }
 
-function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives }) {
+function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
+  const [rowHov, setRowHov] = useState(false)
+  const [thumbHov, setThumbHov] = useState(false)
   return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
-      gap: 8, padding: '5px 8px',
-      borderRadius: isExpanded ? '7px 7px 0 0' : 7,
-      background: isExpanded
-        ? 'rgba(234,179,8,0.04)'
-        : isSelected ? 'rgba(249,115,22,0.05)' : 'transparent',
-      borderBottom: isExpanded ? '1px solid rgba(234,179,8,0.15)' : 'none',
-      alignItems: 'center', transition: 'background 0.1s',
-    }}>
+    <div
+      onMouseEnter={() => setRowHov(true)}
+      onMouseLeave={() => setRowHov(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 32px',
+        gap: 8, padding: '5px 8px',
+        borderRadius: isExpanded ? '7px 7px 0 0' : 7,
+        background: isExpanded
+          ? 'rgba(234,179,8,0.04)'
+          : isSelected ? 'rgba(249,115,22,0.05)'
+          : rowHov ? 'rgba(255,255,255,0.03)' : 'transparent',
+        borderBottom: isExpanded ? '1px solid rgba(234,179,8,0.15)' : 'none',
+        alignItems: 'center', transition: 'background 0.1s',
+      }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <input type="checkbox" checked={isSelected} onChange={onToggle} style={{ width: 15, height: 15 }} />
       </div>
-      <div style={{
-        width: 40, height: 40, borderRadius: 6,
-        background: item.color || '#18181b',
-        display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden',
-      }}>
+      <div
+        onClick={onPickCover}
+        onMouseEnter={() => setThumbHov(true)}
+        onMouseLeave={() => setThumbHov(false)}
+        style={{
+          width: 40, height: 40, borderRadius: 6,
+          background: item.color || '#18181b',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+          overflow: 'hidden', cursor: 'pointer', position: 'relative',
+        }}
+      >
         {item.artwork_url ? (
           <img src={item.artwork_url} alt={item.title} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
@@ -283,6 +313,18 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
             <circle cx="6" cy="18" r="3"/>
             <circle cx="18" cy="16" r="3"/>
           </svg>
+        )}
+        {thumbHov && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0,0,0,0.58)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="1.8" strokeLinecap="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
         )}
       </div>
 

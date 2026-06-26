@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { importFromYandex, resolveUrl, searchTracks } from '../api'
-import { accent, bg, border, text } from '../theme'
+import { accent, bg, border, semantic, text } from '../theme'
 
 const SC_URL = /soundcloud\.com\//i
 const YM_URL = /music\.yandex\.(ru|com)\/playlists\//i
@@ -10,13 +10,14 @@ function fmt(sec) {
   return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
 }
 
-function TrackCard({ track, isAdded, onAdd, index }) {
+function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   const [hov, setHov] = useState(false)
+
   return (
     <div
       style={{
         background: bg.surface,
-        border: `1px solid ${hov ? (isAdded ? border.strong : border.accent) : border.default}`,
+        border: `1px solid ${hov ? (isAdded ? 'rgba(239,68,68,0.45)' : border.accent) : border.default}`,
         borderRadius: 10, overflow: 'hidden',
         transition: 'border-color 0.2s, transform 0.2s cubic-bezier(0.16,1,0.3,1), box-shadow 0.2s',
         transform: hov ? 'translateY(-2px)' : 'translateY(0)',
@@ -27,7 +28,7 @@ function TrackCard({ track, isAdded, onAdd, index }) {
       }}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
-      onClick={() => !isAdded && onAdd()}
+      onClick={() => isAdded ? onRemove() : onAdd()}
     >
       {/* Artwork */}
       <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || '#18181b' }}>
@@ -64,12 +65,21 @@ function TrackCard({ track, isAdded, onAdd, index }) {
           {isAdded ? (
             <div style={{
               width: 38, height: 38, borderRadius: '50%',
-              background: 'rgba(34,197,94,0.85)',
+              background: hov ? 'rgba(239,68,68,0.88)' : 'rgba(34,197,94,0.85)',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'background 0.18s',
+              boxShadow: hov ? '0 4px 16px rgba(239,68,68,0.45)' : 'none',
             }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
+              {hov ? (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/>
+                  <line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              ) : (
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
+                  <polyline points="20 6 9 17 4 12"/>
+                </svg>
+              )}
             </div>
           ) : hov && (
             <div style={{
@@ -102,50 +112,29 @@ function TrackCard({ track, isAdded, onAdd, index }) {
 
       {/* Info */}
       <div style={{ padding: '11px 12px 12px' }}>
-        <div style={{ fontWeight: 600, fontSize: 13, color: hov ? '#fff' : '#fafafa', marginBottom: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.title}</div>
-        <div style={{ fontSize: 12, color: hov ? '#a1a1aa' : '#71717a', marginBottom: 11, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.artist}</div>
-        <AddButton isAdded={isAdded} onAdd={e => { e.stopPropagation(); onAdd() }} />
+        <div style={{ fontWeight: 600, fontSize: 13, color: text.primary, marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{track.title}</div>
+        <div style={{ fontSize: 12, color: hov ? text.secondary : text.muted, marginBottom: isAdded ? 8 : 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', transition: 'color 0.15s' }}>{track.artist}</div>
+        {isAdded && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: hov ? 'rgba(239,68,68,0.9)' : semantic.success, fontSize: 11, fontWeight: 500, transition: 'color 0.18s' }}>
+            {hov ? (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/>
+                <line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            ) : (
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            )}
+            {hov ? 'Remove from queue' : 'Added to queue'}
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-function AddButton({ isAdded, onAdd }) {
-  const [hov, setHov] = useState(false)
-  return (
-    <button
-      onClick={onAdd}
-      disabled={isAdded}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        padding: '6px 10px', borderRadius: 6,
-        background: hov && !isAdded ? 'rgba(249,115,22,0.07)' : 'transparent',
-        cursor: isAdded ? 'default' : 'pointer',
-        display: 'flex', alignItems: 'center', gap: 5,
-        width: '100%', justifyContent: 'center',
-        fontSize: 12, fontWeight: 500,
-        fontFamily: "'Space Grotesk', sans-serif",
-        transition: 'background 0.1s',
-        border: `1px solid ${isAdded ? '#27272a' : '#f97316'}`,
-        color: isAdded ? '#52525b' : '#f97316',
-      }}
-    >
-      {isAdded ? (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-          <polyline points="20 6 9 17 4 12"/>
-        </svg>
-      ) : (
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-          <path d="M12 5v14M5 12h14"/>
-        </svg>
-      )}
-      {isAdded ? 'Added' : 'Add to Queue'}
-    </button>
-  )
-}
-
-export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
+export default function SearchPanel({ onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -223,6 +212,11 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
     setAdded(prev => new Set(prev).add(track.id))
   }
 
+  const handleRemove = (track) => {
+    onRemoveFromQueue(track.id)
+    setAdded(prev => { const s = new Set(prev); s.delete(track.id); return s })
+  }
+
   const handleAddAll = () => {
     const toAdd = results.filter(t => !added.has(t.id))
     toAdd.forEach(t => handleAdd(t))
@@ -235,7 +229,6 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  // When yandexConnected becomes true, retry any pending Yandex URL
   useEffect(() => {
     if (yandexConnected && pendingYandexUrl.current) {
       doSearch(pendingYandexUrl.current)
@@ -246,25 +239,23 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
   return (
     <>
       <div style={{ animation: 'fadeIn 0.2s ease' }}>
-        {/* Search bar */}
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ position: 'relative' }}>
-            <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#52525b', display: 'flex', pointerEvents: 'none' }}>
+        {/* Search bar + Import button on same row */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 24 }}>
+          <div style={{ position: 'relative', flex: 1 }}>
+            <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: text.muted, display: 'flex', pointerEvents: 'none' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
               </svg>
             </div>
             <SearchInput value={query} onChange={handleInput} loading={loading} />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 9 }}>
-            <ImportListBtn onClick={onOpenImport} />
-          </div>
+          <ImportListBtn onClick={onOpenImport} />
         </div>
 
         {/* Results toolbar */}
         {results.length > 0 && !loading && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
-            <span style={{ fontSize: 13, color: '#52525b' }}>
+            <span style={{ fontSize: 13, color: text.muted }}>
               {(page - 1) * PAGE_SIZE + 1}–{(page - 1) * PAGE_SIZE + results.length} tracks
               {hasMore && <span> · more available</span>}
               {importStats && <span> · {importStats.not_found} not found on SoundCloud</span>}
@@ -273,13 +264,13 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
               <button
                 onClick={handleAddAll}
                 style={{
-                  padding: '7px 14px', background: '#f97316', border: 'none', borderRadius: 7,
+                  padding: '7px 14px', background: accent[500], border: 'none', borderRadius: 7,
                   color: 'white', fontSize: 13, fontWeight: 600, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: 6, transition: 'background 0.15s',
                   fontFamily: "'Space Grotesk', sans-serif",
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = '#c2410c'}
-                onMouseLeave={e => e.currentTarget.style.background = '#f97316'}
+                onMouseEnter={e => e.currentTarget.style.background = accent[600]}
+                onMouseLeave={e => e.currentTarget.style.background = accent[500]}
               >
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
                   <path d="M12 5v14M5 12h14"/>
@@ -290,17 +281,17 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
           </div>
         )}
 
-        {error && <p style={{ color: '#ef4444', fontSize: 13, marginBottom: 16 }}>{error}</p>}
+        {error && <p style={{ color: semantic.error, fontSize: 13, marginBottom: 16 }}>{error}</p>}
 
         {/* Loading skeleton */}
         {loading && (
           <div>
             {loadingMsg && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accent[500]} strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
                   <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
                 </svg>
-                <span style={{ fontSize: 13, color: '#52525b' }}>{loadingMsg}</span>
+                <span style={{ fontSize: 13, color: text.muted }}>{loadingMsg}</span>
               </div>
             )}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(188px, 1fr))', gap: 13 }}>
@@ -310,7 +301,6 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
                   <div style={{ padding: '11px 12px 12px', display: 'flex', flexDirection: 'column', gap: 7 }}>
                     <div className="skeleton" style={{ height: 14, width: '80%' }} />
                     <div className="skeleton" style={{ height: 12, width: '55%' }} />
-                    <div className="skeleton" style={{ height: 30, width: '100%', marginTop: 2 }} />
                   </div>
                 </div>
               ))}
@@ -329,6 +319,7 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
                   index={index}
                   isAdded={added.has(track.id)}
                   onAdd={() => handleAdd(track)}
+                  onRemove={() => handleRemove(track)}
                 />
               ))}
             </div>
@@ -338,8 +329,8 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
           </>
         )}
 
-        {/* Empty state */}
-        {!loading && results.length === 0 && !query.trim() && !error && (
+        {/* Empty state — shown until results arrive, text adapts to query */}
+        {!loading && results.length === 0 && !error && (
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
             <div style={{
               position: 'absolute', inset: 0,
@@ -349,19 +340,19 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
               maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
               pointerEvents: 'none',
             }} />
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative' }}>
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative' }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
             <div style={{ position: 'relative' }}>
-              <p style={{ fontSize: 15, color: '#52525b', fontWeight: 500, marginBottom: 6 }}>Search for music</p>
-              <p style={{ fontSize: 13, color: '#3f3f46', maxWidth: 320, lineHeight: 1.6 }}>Paste a SoundCloud or Yandex Music URL, or type a track or artist name</p>
+              {query.trim() ? (
+                <p style={{ fontSize: 15, color: text.muted, fontWeight: 500 }}>No results for "{query}"</p>
+              ) : (
+                <>
+                  <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Search for music</p>
+                  <p style={{ fontSize: 13, color: text.muted, opacity: 0.7, maxWidth: 320, lineHeight: 1.6 }}>Paste a SoundCloud or Yandex Music URL, or type a track or artist name</p>
+                </>
+              )}
             </div>
-          </div>
-        )}
-
-        {!loading && results.length === 0 && query.trim() && !error && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '88px 0' }}>
-            <p style={{ fontSize: 14, color: '#52525b' }}>No results for "{query}"</p>
           </div>
         )}
       </div>
@@ -385,7 +376,7 @@ function Pagination({ page, hasMore, onChange }) {
       {start > 1 && (
         <>
           <PageBtn p={1} active={false} onClick={() => onChange(1)} />
-          {start > 2 && <span style={{ color: '#3f3f46', fontSize: 13 }}>…</span>}
+          {start > 2 && <span style={{ color: text.muted, fontSize: 13 }}>…</span>}
         </>
       )}
 
@@ -393,7 +384,7 @@ function Pagination({ page, hasMore, onChange }) {
         <PageBtn key={p} p={p} active={p === page} onClick={() => onChange(p)} />
       ))}
 
-      {hasMore && <span style={{ color: '#3f3f46', fontSize: 13 }}>…</span>}
+      {hasMore && <span style={{ color: text.muted, fontSize: 13 }}>…</span>}
 
       <NavBtn disabled={!hasMore} onClick={() => onChange(page + 1)}>
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -413,8 +404,8 @@ function PageBtn({ p, active, onClick }) {
       onMouseLeave={() => setHov(false)}
       style={{
         width: 34, height: 34, borderRadius: 7, border: 'none',
-        background: active ? '#f97316' : hov ? '#27272a' : 'transparent',
-        color: active ? 'white' : hov ? '#fafafa' : '#71717a',
+        background: active ? accent[500] : hov ? 'rgba(255,255,255,0.06)' : 'transparent',
+        color: active ? 'white' : hov ? text.primary : text.secondary,
         fontSize: 13, fontWeight: active ? 700 : 400,
         cursor: 'pointer', transition: 'all 0.15s',
         fontFamily: "'Space Grotesk', sans-serif",
@@ -436,9 +427,9 @@ function NavBtn({ disabled, onClick, children }) {
       onMouseLeave={() => setHov(false)}
       style={{
         width: 34, height: 34, borderRadius: 7,
-        background: hov && !disabled ? '#27272a' : 'transparent',
-        border: '1px solid #27272a',
-        color: disabled ? '#3f3f46' : hov ? '#fafafa' : '#71717a',
+        background: hov && !disabled ? 'rgba(255,255,255,0.06)' : 'transparent',
+        border: `1px solid ${border.subtle}`,
+        color: disabled ? text.muted : hov ? text.primary : text.secondary,
         cursor: disabled ? 'not-allowed' : 'pointer',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
         transition: 'all 0.15s',
@@ -457,16 +448,18 @@ function ImportListBtn({ onClick }) {
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       style={{
-        background: 'transparent', border: 'none',
+        padding: '0 16px', height: 46, flexShrink: 0,
+        background: hov ? 'rgba(255,255,255,0.04)' : 'transparent',
+        border: `1px solid ${hov ? border.strong : border.default}`,
+        borderRadius: 10,
         color: hov ? text.secondary : text.muted,
-        fontSize: 12, cursor: 'pointer',
-        display: 'flex', alignItems: 'center', gap: 5,
-        padding: '3px 0',
+        fontSize: 13, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 7,
         fontFamily: "'Space Grotesk', sans-serif",
-        transition: 'color 0.15s',
+        transition: 'all 0.15s', whiteSpace: 'nowrap',
       }}
     >
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
         <line x1="8" y1="6" x2="21" y2="6"/>
         <line x1="8" y1="12" x2="21" y2="12"/>
         <line x1="8" y1="18" x2="21" y2="18"/>

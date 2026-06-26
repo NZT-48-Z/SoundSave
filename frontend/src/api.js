@@ -93,3 +93,11 @@ export async function clearHistory() {
   if (!r.ok) throw new Error('Failed to clear history')
   return r.json()
 }
+
+export async function uploadCover(file) {
+  const form = new FormData()
+  form.append('file', file)
+  const r = await fetch(`${BASE}/upload/cover`, { method: 'POST', body: form })
+  if (!r.ok) throw new Error(await r.text())
+  return r.json() // { url }
+}
