@@ -5,6 +5,9 @@ import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
 import EmptyState from './EmptyState'
 import { isModifiedTitle } from '../utils/trackModifiers'
+import { fmtDuration } from '../utils/format'
+
+const COLS = '20px 32px 44px 1fr 1fr 150px 110px 50px 28px 28px'
 
 function InlineInput({ value, onChange, placeholder, color }) {
   const [focused, setFocused] = useState(false)
@@ -29,7 +32,7 @@ function InlineInput({ value, onChange, placeholder, color }) {
   )
 }
 
-export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownloaded, showToast, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
+export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReorder, onDownloaded, showToast, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [selected, setSelected] = useState(new Set())
   const [bulkArtist, setBulkArtist] = useState('')
   const [bulkAlbum, setBulkAlbum] = useState('')
@@ -39,6 +42,8 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const [coverPickerId, setCoverPickerId] = useState(null)
+  const [dragIndex, setDragIndex] = useState(null)
+  const [dragOverIndex, setDragOverIndex] = useState(null)
 
   const allSelected = queue.length > 0 && selected.size === queue.length
   const hasSelected = selected.size > 0
@@ -85,7 +90,27 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
     }
   }
 
-  // Queue total duration — durations are stored as numeric seconds
+  const handleDownloadSelected = async () => {
+    const items = queue.filter(i => selected.has(i.id))
+    if (!items.length) return
+    setLoading(true)
+    try {
+      const payload = items.map(i => ({
+        url: i.url, title: i.title, artist: i.artist,
+        album: i.album || null, genre: i.genre || null,
+        artwork_url: i.artwork_url || null,
+        artwork_local_path: i.artwork_local_path || null,
+      }))
+      const result = await startBulkDownload(payload)
+      onDownloaded(items.map(i => i.id), result.ids || [])
+    } catch (e) {
+      console.error('Download failed', e)
+      showToast?.('Download failed', 'error')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
   const queueTotalMins = Math.floor(queueTotalSecs / 60)
   const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
@@ -101,8 +126,12 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
         </EmptyState>
       ) : (
         <>
-      {/* Toolbar */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18, gap: 12, flexWrap: 'wrap' }}>
+      {/* Toolbar — sticky below nav */}
+      <div style={{
+        position: 'sticky', top: 58, zIndex: 10,
+        background: bg.page, paddingBottom: 18,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+      }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{queue.length} tracks in queue</span>
           {queueTotalDuration && (
@@ -129,6 +158,29 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
             </svg>
             Clear
           </button>
+          {hasSelected && (
+            <button
+              onClick={handleDownloadSelected}
+              disabled={loading}
+              style={{
+                padding: '7px 14px', background: 'transparent',
+                border: `1px solid ${border.default}`, borderRadius: 7,
+                color: text.secondary, fontSize: 13, fontWeight: 500,
+                cursor: loading ? 'default' : 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { if (!loading) { e.currentTarget.style.borderColor = accent[500]; e.currentTarget.style.color = accent[500] } }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = border.default; e.currentTarget.style.color = text.secondary }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="7 10 12 15 17 10"/>
+                <line x1="12" y1="15" x2="12" y2="3"/>
+              </svg>
+              Download ({selected.size})
+            </button>
+          )}
           <button
             onClick={handleDownload}
             disabled={loading}
@@ -181,45 +233,78 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
             onMouseEnter={e => e.currentTarget.style.background = accent[700]}
             onMouseLeave={e => e.currentTarget.style.background = accent[500]}
           >Apply</button>
+          <button
+            onClick={() => {
+              selected.forEach(id => onRemove(id))
+              setSelected(new Set())
+            }}
+            style={{
+              padding: '4px 10px', background: 'transparent',
+              border: `1px solid rgba(239,68,68,0.3)`, borderRadius: 5,
+              color: semantic.error, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              fontFamily: "'Space Grotesk', sans-serif", transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+          >Remove</button>
         </div>
       )}
 
       {/* Table header */}
       <div style={{
-        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 28px 28px',
+        display: 'grid', gridTemplateColumns: COLS,
         gap: 8, padding: '0 8px 8px', borderBottom: `1px solid ${border.default}`, marginBottom: 2,
         alignItems: 'center',
       }}>
         <div />
         <div />
+        <div />
         {['Title', 'Artist', 'Album', 'Genre'].map(h => (
           <div key={h} style={{ fontSize: 11, fontWeight: 600, color: text.muted, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{h}</div>
         ))}
+        <div style={{ fontSize: 11, fontWeight: 600, color: text.muted, textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'right', paddingRight: 4 }}>Dur.</div>
         <div />
         <div />
       </div>
 
       {/* Rows */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {queue.map(item => {
+        {queue.map((item, index) => {
           const modified = isModifiedTitle(item.title)
           const expanded = expandedId === item.id
           return (
             <div key={item.id}>
               <QueueRow
                 item={item}
+                index={index}
                 isSelected={selected.has(item.id)}
                 isModified={modified}
                 isExpanded={expanded}
+                isDragging={dragIndex === index}
+                isDragOver={dragOverIndex === index && dragIndex !== index}
                 onToggle={() => toggle(item.id)}
                 onUpdate={(field, val) => onUpdate(item.id, { [field]: val })}
-                onRemove={() => { onRemove(item.id); setSelected(prev => { const n = new Set(prev); n.delete(item.id); return n }); if (expandedId === item.id) setExpandedId(null) }}
+                onRemove={() => {
+                  onRemove(item.id)
+                  setSelected(prev => { const n = new Set(prev); n.delete(item.id); return n })
+                  if (expandedId === item.id) setExpandedId(null)
+                }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
                 onPickCover={() => setCoverPickerId(item.id)}
                 onPreview={() => onPreview(item)}
                 isPreviewActive={previewTrackId === item.id}
                 isPreviewPlaying={isPreviewPlaying}
                 previewLoading={previewLoading}
+                onDragStart={() => setDragIndex(index)}
+                onDragOver={() => setDragOverIndex(index)}
+                onDrop={() => {
+                  if (dragIndex !== null && dragOverIndex !== null && dragIndex !== dragOverIndex) {
+                    onReorder(dragIndex, dragOverIndex)
+                  }
+                  setDragIndex(null)
+                  setDragOverIndex(null)
+                }}
+                onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
               />
               {expanded && modified && (
                 <AlternativesPanel
@@ -273,7 +358,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   )
 }
 
-function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading }) {
+function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
@@ -281,22 +366,49 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
   const [playHov, setPlayHov] = useState(false)
   return (
     <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver() }}
+      onDrop={(e) => { e.preventDefault(); onDrop() }}
+      onDragEnd={onDragEnd}
       onMouseEnter={() => setRowHov(true)}
       onMouseLeave={() => setRowHov(false)}
       style={{
-        display: 'grid', gridTemplateColumns: '32px 44px 1fr 1fr 150px 110px 28px 28px',
+        display: 'grid', gridTemplateColumns: COLS,
         gap: 8, padding: '5px 8px',
         borderRadius: isExpanded ? '7px 7px 0 0' : 7,
         background: isExpanded
           ? 'rgba(234,179,8,0.04)'
           : isSelected ? 'rgba(249,115,22,0.05)'
           : rowHov ? 'rgba(255,255,255,0.03)' : 'transparent',
+        borderTop: isDragOver ? `2px solid ${accent[500]}` : '2px solid transparent',
         borderBottom: isExpanded ? '1px solid rgba(234,179,8,0.15)' : 'none',
         alignItems: 'center', transition: 'background 0.1s',
+        opacity: isDragging ? 0.4 : 1,
       }}>
+
+      {/* Drag handle */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: rowHov ? neutral[600] : 'transparent',
+        cursor: 'grab', transition: 'color 0.1s', userSelect: 'none',
+      }}>
+        <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
+          <circle cx="3" cy="2.5" r="1.2"/>
+          <circle cx="7" cy="2.5" r="1.2"/>
+          <circle cx="3" cy="7" r="1.2"/>
+          <circle cx="7" cy="7" r="1.2"/>
+          <circle cx="3" cy="11.5" r="1.2"/>
+          <circle cx="7" cy="11.5" r="1.2"/>
+        </svg>
+      </div>
+
+      {/* Checkbox */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <input type="checkbox" checked={isSelected} onChange={onToggle} style={{ width: 15, height: 15 }} />
       </div>
+
+      {/* Artwork */}
       <div
         onClick={onPickCover}
         onMouseEnter={() => setThumbHov(true)}
@@ -361,6 +473,13 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
       <InlineInput value={item.artist} onChange={v => onUpdate('artist', v)} placeholder="Artist" color={neutral[400]} />
       <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color={neutral[500]} />
       <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color={neutral[500]} />
+
+      {/* Duration */}
+      <div style={{ fontSize: 11, color: neutral[600], fontFamily: "'JetBrains Mono', monospace", textAlign: 'right', paddingRight: 4 }}>
+        {item.duration > 0 ? fmtDuration(item.duration) : ''}
+      </div>
+
+      {/* Preview button */}
       <button
         onClick={onPreview}
         onMouseEnter={() => setPlayHov(true)}
@@ -390,6 +509,8 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
           </svg>
         )}
       </button>
+
+      {/* Delete button */}
       <button
         onClick={onRemove}
         onMouseEnter={() => setDelHov(true)}
