@@ -37,8 +37,11 @@ function InlineInput({ value, onChange, placeholder, color }) {
 
 export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownloaded, showToast }) {
   const [selected, setSelected] = useState(new Set())
+  const [bulkArtist, setBulkArtist] = useState('')
   const [bulkAlbum, setBulkAlbum] = useState('')
   const [bulkGenre, setBulkGenre] = useState('')
+  const [bulkCover, setBulkCover] = useState(null)
+  const [bulkCoverOpen, setBulkCoverOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const [coverPickerId, setCoverPickerId] = useState(null)
@@ -56,12 +59,16 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
   const applyBulk = () => {
     selected.forEach(id => {
       const u = {}
+      if (bulkArtist.trim()) u.artist = bulkArtist.trim()
       if (bulkAlbum.trim()) u.album = bulkAlbum.trim()
       if (bulkGenre.trim()) u.genre = bulkGenre.trim()
+      if (bulkCover) { u.artwork_url = bulkCover.url; u.artwork_local_path = bulkCover.path }
       if (Object.keys(u).length) onUpdate(id, u)
     })
+    setBulkArtist('')
     setBulkAlbum('')
     setBulkGenre('')
+    setBulkCover(null)
   }
 
   const handleDownload = async () => {
@@ -183,8 +190,10 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
             <rect x="3" y="14" width="7" height="7" rx="1"/>
           </svg>
           <span style={{ fontSize: 12, color: '#f97316', fontWeight: 600, whiteSpace: 'nowrap' }}>{selected.size} selected —</span>
-          <BulkInput value={bulkAlbum} onChange={setBulkAlbum} placeholder="Album for all…" width={140} />
-          <BulkInput value={bulkGenre} onChange={setBulkGenre} placeholder="Genre for all…" width={120} />
+          <BulkInput value={bulkArtist} onChange={setBulkArtist} placeholder="Artist for all…" width={120} />
+          <BulkInput value={bulkAlbum} onChange={setBulkAlbum} placeholder="Album for all…" width={120} />
+          <BulkInput value={bulkGenre} onChange={setBulkGenre} placeholder="Genre for all…" width={110} />
+          <BulkCoverBtn cover={bulkCover} onClick={() => setBulkCoverOpen(true)} onClear={() => setBulkCover(null)} />
           <button
             onClick={applyBulk}
             style={{
@@ -267,6 +276,17 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
           />
         ) : null
       })()}
+
+      {bulkCoverOpen && (
+        <CoverPickerModal
+          item={queue.find(i => selected.has(i.id)) || {}}
+          onClose={() => setBulkCoverOpen(false)}
+          onConfirm={({ url, path }) => {
+            setBulkCover({ url, path })
+            setBulkCoverOpen(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -395,6 +415,57 @@ function ToolbarBtn({ children, onClick }) {
         borderColor: hov ? '#3f3f46' : '#27272a',
       }}
     >{children}</button>
+  )
+}
+
+function BulkCoverBtn({ cover, onClick, onClear }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <button
+        onClick={onClick}
+        onMouseEnter={() => setHov(true)}
+        onMouseLeave={() => setHov(false)}
+        title="Set cover for all selected"
+        style={{
+          height: 28, padding: '0 8px',
+          background: cover ? 'rgba(249,115,22,0.12)' : bg.surface,
+          border: `1px solid ${cover ? '#f97316' : hov ? '#3f3f46' : '#27272a'}`,
+          borderRadius: 5, cursor: 'pointer',
+          display: 'flex', alignItems: 'center', gap: 5,
+          color: cover ? '#f97316' : hov ? text.primary : text.secondary,
+          fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
+          transition: 'all 0.12s',
+        }}
+      >
+        {cover ? (
+          <img src={cover.url} alt="" style={{ width: 18, height: 18, borderRadius: 3, objectFit: 'cover' }} />
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+            <circle cx="12" cy="13" r="4"/>
+          </svg>
+        )}
+        <span>{cover ? 'Cover set' : 'Cover…'}</span>
+      </button>
+      {cover && (
+        <button
+          onClick={onClear}
+          title="Clear cover"
+          style={{
+            width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: '#71717a', padding: 0,
+          }}
+          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
+          onMouseLeave={e => e.currentTarget.style.color = '#71717a'}
+        >
+          <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      )}
+    </div>
   )
 }
 
