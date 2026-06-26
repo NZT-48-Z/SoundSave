@@ -14,7 +14,7 @@ _executor = ThreadPoolExecutor(max_workers=2)
 
 @router.get("/preview")
 async def preview(url: str = Query(...)):
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
     try:
         return await loop.run_in_executor(_executor, get_preview_url, url)
     except SoundCloudError as e:
