@@ -90,7 +90,7 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
         logger.error("ID3 write failed for %s: %s", filepath, e)
 
 
-def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.AbstractEventLoop) -> str:
+def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.AbstractEventLoop, batch_dir: str) -> str:
     found_path: list[str] = []
 
     def progress_hook(d: dict) -> None:
@@ -115,8 +115,11 @@ def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.Abstrac
                 loop,
             )
 
+    batch_path = os.path.join(DOWNLOAD_DIR, batch_dir)
+    os.makedirs(batch_path, exist_ok=True)
+
     safe_title = _safe_filename(meta.title)
-    out_tmpl = os.path.join(DOWNLOAD_DIR, f"{safe_title}.%(ext)s")
+    out_tmpl = os.path.join(batch_path, f"{safe_title}.%(ext)s")
 
     ffmpeg = get_ffmpeg_location()
     ydl_opts = {
@@ -153,7 +156,7 @@ def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.Abstrac
         base = os.path.splitext(found_path[0])[0]
         mp3 = base + ".mp3"
     else:
-        mp3 = os.path.join(DOWNLOAD_DIR, f"{safe_title}.mp3")
+        mp3 = os.path.join(batch_path, f"{safe_title}.mp3")
 
     if not os.path.exists(mp3):
         raise DownloadError(f"File not found after download: {mp3}")
@@ -168,9 +171,18 @@ async def _update_db(download_id: str, **fields) -> None:
         await session.commit()
 
 
+def _cleanup_batch_dir_if_empty(batch_dir: str) -> None:
+    path = os.path.join(DOWNLOAD_DIR, batch_dir)
+    try:
+        if os.path.isdir(path) and not os.listdir(path):
+            os.rmdir(path)
+    except OSError:
+        pass
+
+
 class DownloadQueue:
     def __init__(self) -> None:
-        self._queue: asyncio.Queue[tuple[str, DownloadRequest]] = asyncio.Queue()
+        self._queue: asyncio.Queue[tuple[str, DownloadRequest, str]] = asyncio.Queue()
         self._task: asyncio.Task | None = None
 
     async def start(self) -> None:
@@ -180,7 +192,7 @@ class DownloadQueue:
         if self._task:
             self._task.cancel()
 
-    async def enqueue(self, meta: DownloadRequest) -> str:
+    async def enqueue(self, meta: DownloadRequest, batch_dir: str) -> str:
         download_id = str(uuid.uuid4())
         async with async_session_factory() as session:
             from app.models.download import Download
@@ -200,13 +212,13 @@ class DownloadQueue:
             await AsyncORM.create_download(session, dl)
             await session.commit()
 
-        await self._queue.put((download_id, meta))
+        await self._queue.put((download_id, meta, batch_dir))
         return download_id
 
     async def _worker(self) -> None:
         loop = asyncio.get_event_loop()
         while True:
-            download_id, meta = await self._queue.get()
+            download_id, meta, batch_dir = await self._queue.get()
             try:
                 # Already cancelled while waiting in queue
                 if download_id in _cancelled_ids:
@@ -215,7 +227,7 @@ class DownloadQueue:
 
                 await _update_db(download_id, status="downloading", progress=0)
                 mp3_path = await loop.run_in_executor(
-                    None, _run_download, download_id, meta, loop
+                    None, _run_download, download_id, meta, loop, batch_dir
                 )
 
                 # Cancelled during convert/tag phase (after progress_hook stops firing)
@@ -255,6 +267,7 @@ class DownloadQueue:
             finally:
                 _cancelled_ids.discard(download_id)
                 self._queue.task_done()
+                _cleanup_batch_dir_if_empty(batch_dir)
 
     async def cancel(self, download_id: str) -> None:
         _cancelled_ids.add(download_id)
