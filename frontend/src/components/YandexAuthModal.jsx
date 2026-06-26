@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { disconnectYandex, pollYandexAuth, startYandexAuth } from '../api'
-import { accent, bg, border, semantic, text } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
 import CloseBtn from './CloseBtn'
 
 export default function YandexAuthModal({ onSuccess, onClose, onDisconnect, isConnected }) {
@@ -214,8 +214,8 @@ export default function YandexAuthModal({ onSuccess, onClose, onDisconnect, isCo
                 color: text.secondary, fontSize: 13, fontWeight: 500,
                 cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s',
               }}
-              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = '#eeeef2' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9898a6' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; e.currentTarget.style.color = text.primary }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = text.secondary }}
             >
               Close
             </button>
