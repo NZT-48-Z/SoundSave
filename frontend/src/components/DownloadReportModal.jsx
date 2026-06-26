@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { bg, border, neutral, semantic, text } from '../theme'
 import CloseBtn from './CloseBtn'
 
@@ -5,6 +6,12 @@ export default function DownloadReportModal({ report, onClose }) {
   const { done, errors } = report
   const total = done.length + errors.length
   const allOk = errors.length === 0
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [onClose])
 
   return (
     <div
