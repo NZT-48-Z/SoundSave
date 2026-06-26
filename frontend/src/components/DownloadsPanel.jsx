@@ -1,13 +1,8 @@
 import { useState } from 'react'
 import { cancelDownload } from '../api'
 import { bg, border, semantic, text } from '../theme'
-
-function fmtSpeed(bps) {
-  if (!bps) return ''
-  const kbps = bps / 1024
-  if (kbps >= 1024) return `${(kbps / 1024).toFixed(1)} MB/s`
-  return `${kbps.toFixed(0)} KB/s`
-}
+import { fmtSpeed } from '../utils/format'
+import EmptyState from './EmptyState'
 
 const ACTIVE_STATUSES = new Set(['pending', 'downloading', 'converting', 'tagging'])
 
@@ -165,25 +160,11 @@ export default function DownloadsPanel({ downloads, onClearHistory }) {
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
       {!downloads.length ? (
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-            WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            pointerEvents: 'none',
-          }} />
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-            <polyline points="7 10 12 15 17 10"/>
-            <line x1="12" y1="15" x2="12" y2="3"/>
-          </svg>
-          <div style={{ position: 'relative' }}>
-            <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>No downloads yet</p>
-            <p style={{ fontSize: 13, color: text.muted, opacity: 0.7 }}>Add tracks to queue and click Download All</p>
-          </div>
-        </div>
+        <EmptyState title="No downloads yet" subtitle="Add tracks to queue and click Download All">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </EmptyState>
       ) : (
         <>
       {/* Toolbar */}
