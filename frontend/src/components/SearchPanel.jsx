@@ -247,6 +247,15 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
     debounce.current = setTimeout(() => doSearch(val, 1), 500)
   }
 
+  const handleClear = () => {
+    setQuery('')
+    setResults([])
+    setPage(1)
+    setHasMore(false)
+    setError('')
+    clearTimeout(debounce.current)
+  }
+
   const handleAdd = (track) => {
     onAddToQueue(track)
   }
@@ -286,6 +295,23 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
               </svg>
             </div>
             <SearchInput value={query} onChange={handleInput} loading={loading} />
+            {query && (
+              <button
+                onClick={handleClear}
+                style={{
+                  position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)',
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  color: text.muted, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 4, borderRadius: 4, transition: 'color 0.12s',
+                }}
+                onMouseEnter={e => e.currentTarget.style.color = text.secondary}
+                onMouseLeave={e => e.currentTarget.style.color = text.muted}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
           </div>
           <ImportListBtn onClick={onOpenImport} />
         </div>
