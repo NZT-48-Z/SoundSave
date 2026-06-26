@@ -17,7 +17,7 @@ function trackColor(id) {
   return palette[n % palette.length]
 }
 
-function Toast({ toasts }) {
+function Toast({ toasts, onDismiss }) {
   if (!toasts.length) return null
   return (
     <div style={{ position: 'fixed', top: 64, right: 20, zIndex: 400, display: 'flex', flexDirection: 'column', gap: 8, pointerEvents: 'none' }}>
@@ -27,12 +27,24 @@ function Toast({ toasts }) {
           padding: '10px 14px', fontSize: 13, color: text.primary,
           display: 'flex', alignItems: 'center', gap: 9,
           animation: 'toastIn 0.2s ease', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
-          maxWidth: 300, pointerEvents: 'all',
+          maxWidth: 320, pointerEvents: 'all',
         }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || semantic.success} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
             <polyline points="20 6 9 17 4 12"/>
           </svg>
-          <span style={{ lineHeight: 1.4 }}>{t.msg}</span>
+          <span style={{ lineHeight: 1.4, flex: 1 }}>{t.msg}</span>
+          {t.action && (
+            <button
+              onClick={() => { t.action.fn(); onDismiss(t.id) }}
+              style={{
+                padding: '3px 8px', background: 'transparent',
+                border: `1px solid ${border.strong}`, borderRadius: 5,
+                color: text.secondary, fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
+                fontFamily: "'Space Grotesk', sans-serif",
+              }}
+            >{t.action.label}</button>
+          )}
         </div>
       ))}
     </div>
@@ -100,11 +112,11 @@ export default function App() {
     }
   }, [downloads, activeBatch])
 
-  const showToast = useCallback((msg, type = 'success') => {
+  const showToast = useCallback((msg, type = 'success', action = null) => {
     const id = Date.now() + Math.random()
-    const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error }[type] || semantic.success
-    setToasts(prev => [...prev, { id, msg, iconColor }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2600)
+    const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error, warning: semantic.warning }[type] || semantic.success
+    setToasts(prev => [...prev, { id, msg, iconColor, action }])
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), action ? 4000 : 2600)
   }, [])
 
   const addToQueue = useCallback((track) => {
@@ -154,7 +166,23 @@ export default function App() {
     setQueue(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
   }, [])
 
-  const clearQueue = useCallback(() => setQueue([]), [])
+  const reorderQueue = useCallback((from, to) => {
+    setQueue(prev => {
+      const next = [...prev]
+      const [item] = next.splice(from, 1)
+      next.splice(to, 0, item)
+      return next
+    })
+  }, [])
+
+  const clearQueue = useCallback(() => {
+    const saved = queue.slice()
+    setQueue([])
+    showToast(`${saved.length} tracks cleared`, 'warning', {
+      label: 'Undo',
+      fn: () => setQueue(saved),
+    })
+  }, [queue, showToast])
 
   const openYandexModal = useCallback(() => setShowYandexModal(true), [])
   const openImportModal = useCallback(() => setShowImportModal(true), [])
@@ -193,6 +221,20 @@ export default function App() {
     setCurrentPreview(null)
     setIsPreviewPlaying(false)
   }, [])
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.code !== 'Space') return
+      const tag = e.target.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target.isContentEditable) return
+      e.preventDefault()
+      if (!currentPreview) return
+      const audio = audioRef.current
+      audio.paused ? audio.play() : audio.pause()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [currentPreview])
 
   const onClearHistory = useCallback(async () => {
     await clearHistory()
@@ -371,6 +413,7 @@ export default function App() {
               onRemove={removeFromQueue}
               onUpdate={updateQueueItem}
               onClear={clearQueue}
+              onReorder={reorderQueue}
               onDownloaded={onDownloaded}
               showToast={showToast}
               onPreview={handlePreview}
@@ -415,7 +458,7 @@ export default function App() {
           onClose={handleClosePreview}
         />
       )}
-      <Toast toasts={toasts} />
+      <Toast toasts={toasts} onDismiss={(id) => setToasts(prev => prev.filter(t => t.id !== id))} />
     </div>
   )
 }
