@@ -1,16 +1,10 @@
 import { useState } from 'react'
 import { startBulkDownload } from '../api'
-import { bg, border, text } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
+import EmptyState from './EmptyState'
 import { isModifiedTitle } from '../utils/trackModifiers'
-
-function fmt(sec) {
-  if (!sec) return null
-  const m = Math.floor(sec / 60)
-  const s = Math.floor(sec % 60)
-  return `${m}:${String(s).padStart(2, '0')}`
-}
 
 function InlineInput({ value, onChange, placeholder, color }) {
   const [focused, setFocused] = useState(false)
@@ -23,10 +17,10 @@ function InlineInput({ value, onChange, placeholder, color }) {
       onFocus={() => setFocused(true)}
       onBlur={() => setFocused(false)}
       style={{
-        background: focused ? '#18181b' : 'transparent',
-        border: `1px solid ${focused ? '#3f3f46' : 'transparent'}`,
+        background: focused ? neutral[900] : 'transparent',
+        border: `1px solid ${focused ? neutral[700] : 'transparent'}`,
         borderRadius: 5, padding: '5px 7px',
-        color: color || '#fafafa', fontSize: 13,
+        color: color || neutral[50], fontSize: 13,
         fontWeight: color ? 400 : 500,
         width: '100%', fontFamily: "'Space Grotesk', sans-serif",
         transition: 'border-color 0.1s', outline: 'none',
@@ -91,37 +85,20 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
     }
   }
 
-  // Queue total duration
-  const queueTotalSecs = queue.reduce((s, item) => {
-    const p = (item.duration || '0:00').toString().split(':').map(Number)
-    return s + (p.length === 2 ? p[0] * 60 + p[1] : 0)
-  }, 0)
+  // Queue total duration — durations are stored as numeric seconds
+  const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
   const queueTotalMins = Math.floor(queueTotalSecs / 60)
   const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
 
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
       {!queue.length ? (
-        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
-          <div style={{
-            position: 'absolute', inset: 0,
-            backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
-            backgroundSize: '28px 28px',
-            WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
-            pointerEvents: 'none',
-          }} />
-          <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke={text.muted} strokeWidth="1" strokeLinecap="round" style={{ position: 'relative' }}>
-            <line x1="21" y1="10" x2="7" y2="10"/>
-            <line x1="21" y1="6" x2="3" y2="6"/>
-            <line x1="21" y1="14" x2="7" y2="14"/>
-            <line x1="21" y1="18" x2="3" y2="18"/>
-          </svg>
-          <div style={{ position: 'relative' }}>
-            <p style={{ fontSize: 15, color: text.muted, fontWeight: 500, marginBottom: 6 }}>Queue is empty</p>
-            <p style={{ fontSize: 13, color: text.muted, opacity: 0.7 }}>Add tracks from Search to build your download queue</p>
-          </div>
-        </div>
+        <EmptyState title="Queue is empty" subtitle="Add tracks from Search to build your download queue">
+          <line x1="21" y1="10" x2="7" y2="10"/>
+          <line x1="21" y1="6" x2="3" y2="6"/>
+          <line x1="21" y1="14" x2="7" y2="14"/>
+          <line x1="21" y1="18" x2="3" y2="18"/>
+        </EmptyState>
       ) : (
         <>
       {/* Toolbar */}
@@ -143,8 +120,8 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
               display: 'flex', alignItems: 'center', gap: 5,
               fontFamily: "'Space Grotesk', sans-serif", transition: 'all 0.15s',
             }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.color = '#ef4444' }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = '#27272a'; e.currentTarget.style.color = '#71717a' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = semantic.error; e.currentTarget.style.color = semantic.error }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = neutral[800]; e.currentTarget.style.color = neutral[500] }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <polyline points="3 6 5 6 21 6"/>
@@ -156,14 +133,14 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
             onClick={handleDownload}
             disabled={loading}
             style={{
-              padding: '7px 16px', background: loading ? '#7c3010' : '#f97316',
+              padding: '7px 16px', background: loading ? accent[800] : accent[500],
               border: 'none', borderRadius: 7, color: 'white',
               fontSize: 13, fontWeight: 600, cursor: loading ? 'default' : 'pointer',
               display: 'flex', alignItems: 'center', gap: 6,
               fontFamily: "'Space Grotesk', sans-serif", transition: 'background 0.15s',
             }}
-            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#c2410c' }}
-            onMouseLeave={e => { if (!loading) e.currentTarget.style.background = '#f97316' }}
+            onMouseEnter={e => { if (!loading) e.currentTarget.style.background = accent[700] }}
+            onMouseLeave={e => { if (!loading) e.currentTarget.style.background = accent[500] }}
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
@@ -183,13 +160,13 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
           background: 'rgba(249,115,22,0.05)', border: '1px solid rgba(249,115,22,0.18)',
           borderRadius: 8, flexWrap: 'wrap', animation: 'fadeIn 0.15s ease',
         }}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke={accent[500]} strokeWidth="2" strokeLinecap="round" style={{ flexShrink: 0 }}>
             <rect x="3" y="3" width="7" height="7" rx="1"/>
             <rect x="14" y="3" width="7" height="7" rx="1"/>
             <rect x="14" y="14" width="7" height="7" rx="1"/>
             <rect x="3" y="14" width="7" height="7" rx="1"/>
           </svg>
-          <span style={{ fontSize: 12, color: '#f97316', fontWeight: 600, whiteSpace: 'nowrap' }}>{selected.size} selected —</span>
+          <span style={{ fontSize: 12, color: accent[500], fontWeight: 600, whiteSpace: 'nowrap' }}>{selected.size} selected —</span>
           <BulkInput value={bulkArtist} onChange={setBulkArtist} placeholder="Artist for all…" width={120} />
           <BulkInput value={bulkAlbum} onChange={setBulkAlbum} placeholder="Album for all…" width={120} />
           <BulkInput value={bulkGenre} onChange={setBulkGenre} placeholder="Genre for all…" width={110} />
@@ -197,12 +174,12 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onDownl
           <button
             onClick={applyBulk}
             style={{
-              padding: '4px 12px', background: '#f97316', border: 'none', borderRadius: 5,
+              padding: '4px 12px', background: accent[500], border: 'none', borderRadius: 5,
               color: 'white', fontSize: 12, fontWeight: 600, cursor: 'pointer',
               fontFamily: "'Space Grotesk', sans-serif", transition: 'background 0.15s',
             }}
-            onMouseEnter={e => e.currentTarget.style.background = '#c2410c'}
-            onMouseLeave={e => e.currentTarget.style.background = '#f97316'}
+            onMouseEnter={e => e.currentTarget.style.background = accent[700]}
+            onMouseLeave={e => e.currentTarget.style.background = accent[500]}
           >Apply</button>
         </div>
       )}
@@ -320,7 +297,7 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
         onMouseLeave={() => setThumbHov(false)}
         style={{
           width: 40, height: 40, borderRadius: 6,
-          background: item.color || '#18181b',
+          background: item.color || neutral[900],
           display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
           overflow: 'hidden', cursor: 'pointer', position: 'relative',
         }}
@@ -363,7 +340,7 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
               background: isExpanded ? 'rgba(234,179,8,0.15)' : warnHov ? 'rgba(234,179,8,0.1)' : 'transparent',
               border: `1px solid ${isExpanded || warnHov ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.2)'}`,
               borderRadius: 5, cursor: 'pointer', transition: 'all 0.12s',
-              color: '#eab308',
+              color: semantic.warning,
             }}
           >
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
@@ -375,18 +352,18 @@ function QueueRow({ item, isSelected, isModified, isExpanded, onToggle, onUpdate
         )}
       </div>
 
-      <InlineInput value={item.artist} onChange={v => onUpdate('artist', v)} placeholder="Artist" color="#a1a1aa" />
-      <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color="#71717a" />
-      <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color="#71717a" />
+      <InlineInput value={item.artist} onChange={v => onUpdate('artist', v)} placeholder="Artist" color={neutral[400]} />
+      <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color={neutral[500]} />
+      <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color={neutral[500]} />
       <button
         onClick={onRemove}
         onMouseEnter={() => setDelHov(true)}
         onMouseLeave={() => setDelHov(false)}
         style={{
           width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          background: delHov ? 'rgba(239,68,68,0.1)' : 'transparent',
+          background: delHov ? semantic.errorBg : 'transparent',
           border: 'none', borderRadius: 5,
-          color: delHov ? '#ef4444' : '#52525b',
+          color: delHov ? semantic.error : neutral[600],
           cursor: 'pointer', transition: 'all 0.1s',
         }}
       >
@@ -409,10 +386,10 @@ function ToolbarBtn({ children, onClick }) {
       style={{
         padding: '4px 10px', background: 'transparent',
         border: `1px solid ${border.default}`, borderRadius: 5,
-        color: hov ? '#fafafa' : '#71717a', fontSize: 12,
+        color: hov ? neutral[50] : neutral[500], fontSize: 12,
         cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif",
         transition: 'all 0.15s',
-        borderColor: hov ? '#3f3f46' : '#27272a',
+        borderColor: hov ? neutral[700] : neutral[800],
       }}
     >{children}</button>
   )
@@ -430,10 +407,10 @@ function BulkCoverBtn({ cover, onClick, onClear }) {
         style={{
           height: 28, padding: '0 8px',
           background: cover ? 'rgba(249,115,22,0.12)' : bg.surface,
-          border: `1px solid ${cover ? '#f97316' : hov ? '#3f3f46' : '#27272a'}`,
+          border: `1px solid ${cover ? accent[500] : hov ? neutral[700] : neutral[800]}`,
           borderRadius: 5, cursor: 'pointer',
           display: 'flex', alignItems: 'center', gap: 5,
-          color: cover ? '#f97316' : hov ? text.primary : text.secondary,
+          color: cover ? accent[500] : hov ? text.primary : text.secondary,
           fontSize: 12, fontFamily: "'Space Grotesk', sans-serif",
           transition: 'all 0.12s',
         }}
@@ -455,10 +432,10 @@ function BulkCoverBtn({ cover, onClick, onClear }) {
           style={{
             width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center',
             background: 'transparent', border: 'none', cursor: 'pointer',
-            color: '#71717a', padding: 0,
+            color: neutral[500], padding: 0,
           }}
-          onMouseEnter={e => e.currentTarget.style.color = '#ef4444'}
-          onMouseLeave={e => e.currentTarget.style.color = '#71717a'}
+          onMouseEnter={e => e.currentTarget.style.color = semantic.error}
+          onMouseLeave={e => e.currentTarget.style.color = neutral[500]}
         >
           <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
             <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -481,7 +458,7 @@ function BulkInput({ value, onChange, placeholder, width }) {
       onBlur={() => setFocused(false)}
       style={{
         padding: '4px 9px', background: bg.surface,
-        border: `1px solid ${focused ? '#f97316' : '#27272a'}`,
+        border: `1px solid ${focused ? accent[500] : neutral[800]}`,
         borderRadius: 5, color: text.primary, fontSize: 12, width,
         outline: 'none', fontFamily: "'Space Grotesk', sans-serif",
       }}

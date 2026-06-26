@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { importBatch } from '../api'
-import { accent, bg, border, semantic, text } from '../theme'
+import { accent, bg, border, neutral, semantic, text } from '../theme'
+import CloseBtn from './CloseBtn'
 
 const IS_URL = /^https?:\/\//
 const IS_TIMESTAMP = /^\d+:\d+/
@@ -50,27 +51,6 @@ function parseInput(rawText) {
 function getHost(url) {
   try { return new URL(url).hostname.replace('www.', '') }
   catch { return url }
-}
-
-function CloseBtn({ onClick }) {
-  const [hov, setHov] = useState(false)
-  return (
-    <button
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: hov ? '#27272a' : 'transparent', border: 'none', borderRadius: 5,
-        color: hov ? '#fafafa' : text.muted, cursor: 'pointer', transition: 'all 0.15s',
-      }}
-    >
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-        <line x1="18" y1="6" x2="6" y2="18"/>
-        <line x1="6" y1="6" x2="18" y2="18"/>
-      </svg>
-    </button>
-  )
 }
 
 export default function ImportTracklistModal({ onClose, onBatchAdd }) {
@@ -161,7 +141,7 @@ export default function ImportTracklistModal({ onClose, onBatchAdd }) {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{
               width: 30, height: 30, borderRadius: 7,
-              background: 'linear-gradient(135deg, #f97316, #c2410c)',
+              background: `linear-gradient(135deg, ${accent[500]}, ${accent[700]})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
             }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round">
@@ -351,7 +331,7 @@ function ItemRow({ item, isLast }) {
             <path d="M12 5v14M5 12h14"/>
           </svg>
         ) : isUrl ? (
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke={semantic.info} strokeWidth="2" strokeLinecap="round">
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/>
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
           </svg>
