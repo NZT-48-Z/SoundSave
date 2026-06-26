@@ -1,9 +1,13 @@
 import logging
+import os
 
 from fastapi import APIRouter, HTTPException
+from sqlalchemy import select
 
 from app.api.dependencies import DbSession
+from app.api.v1.covers import COVERS_DIR
 from app.database.query.orm import AsyncORM
+from app.models.download import Download
 from app.schemas.download import BulkDownloadRequest, DownloadRecord, DownloadRequest
 from app.services.downloader import download_queue
 
@@ -47,5 +51,20 @@ async def cancel_download(download_id: str, db: DbSession):
 
 @router.delete("/downloads")
 async def clear_history(db: DbSession):
+    _CLEAR_STATUSES = {"done", "error", "cancelled", "downloading", "converting", "tagging"}
+    result = await db.execute(
+        select(Download.artwork_url).where(Download.status.in_(_CLEAR_STATUSES))
+    )
+    cover_urls = [row[0] for row in result if row[0] and "/api/v1/covers/" in row[0]]
+
     count = await AsyncORM.clear_finished_downloads(db)
+
+    for url in cover_urls:
+        filename = os.path.basename(url.split("/api/v1/covers/")[-1])
+        path = os.path.join(COVERS_DIR, filename)
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
     return {"deleted": count}
