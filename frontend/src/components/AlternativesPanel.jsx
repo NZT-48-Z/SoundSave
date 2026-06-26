@@ -2,11 +2,7 @@ import { useEffect, useState } from 'react'
 import { getAlternatives } from '../api'
 import { bg, border } from '../theme'
 import { cleanTitle, isModifiedTitle } from '../utils/trackModifiers'
-
-function fmt(sec) {
-  if (!sec) return ''
-  return `${Math.floor(sec / 60)}:${String(Math.floor(sec % 60)).padStart(2, '0')}`
-}
+import { fmtDuration } from '../utils/format'
 
 export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) {
   const [state, setState] = useState('loading') // loading | done | error
@@ -130,7 +126,7 @@ export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) 
                   {/* Duration */}
                   {track.duration > 0 && (
                     <span style={{ fontSize: 11, color: '#52525b', fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
-                      {fmt(track.duration)}
+                      {fmtDuration(track.duration)}
                     </span>
                   )}
 
