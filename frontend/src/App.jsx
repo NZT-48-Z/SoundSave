@@ -290,6 +290,7 @@ export default function App() {
         {activeTab === 'search' && (
           <SearchPanel
             onAddToQueue={addToQueue}
+            onRemoveFromQueue={removeFromQueue}
             showToast={showToast}
             yandexConnected={yandexConnected}
             onYandexConnected={handleYandexAuthSuccess}
