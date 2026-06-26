@@ -30,7 +30,13 @@ function Toast({ toasts, onDismiss }) {
           maxWidth: 320, pointerEvents: 'all',
         }}>
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || semantic.success} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
-            <polyline points="20 6 9 17 4 12"/>
+            {t.type === 'error' ? (
+              <><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>
+            ) : t.type === 'warning' ? (
+              <><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>
+            ) : (
+              <polyline points="20 6 9 17 4 12"/>
+            )}
           </svg>
           <span style={{ lineHeight: 1.4, flex: 1 }}>{t.msg}</span>
           {t.action && (
@@ -115,7 +121,7 @@ export default function App() {
   const showToast = useCallback((msg, type = 'success', action = null) => {
     const id = Date.now() + Math.random()
     const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error, warning: semantic.warning }[type] || semantic.success
-    setToasts(prev => [...prev, { id, msg, iconColor, action }])
+    setToasts(prev => [...prev, { id, msg, type, iconColor, action }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), action ? 4000 : 2600)
   }, [])
 
@@ -180,7 +186,7 @@ export default function App() {
     setQueue([])
     showToast(`${saved.length} tracks cleared`, 'warning', {
       label: 'Undo',
-      fn: () => setQueue(saved),
+      fn: () => setQueue(prev => [...saved, ...prev.filter(t => !saved.find(s => s.id === t.id))]),
     })
   }, [queue, showToast])
 
