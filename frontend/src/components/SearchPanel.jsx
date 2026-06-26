@@ -187,11 +187,13 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
   const pendingYandexUrl = useRef(null)
   const debounce = useRef(null)
   const currentQuery = useRef('')
+  const searchId = useRef(0)
 
   const PAGE_SIZE = 20
 
   const doSearch = useCallback(async (q, p = 1) => {
     if (!q.trim()) { setResults([]); setImportStats(null); setPage(1); setHasMore(false); return }
+    const id = ++searchId.current
     setLoading(true)
     setError('')
     if (p === 1) setImportStats(null)
@@ -229,13 +231,12 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
         setHasMore(res.has_more)
         setPage(p)
       }
-      setResults(tracks)
+      if (id === searchId.current) setResults(tracks)
     } catch {
-      setError('Failed. Check the URL or try again.')
-      setResults([])
+      if (id === searchId.current) setError('Failed. Check the URL or try again.')
+      if (id === searchId.current) setResults([])
     } finally {
-      setLoading(false)
-      setLoadingMsg('')
+      if (id === searchId.current) { setLoading(false); setLoadingMsg('') }
     }
   }, [onOpenYandexAuth])
 
@@ -248,11 +249,15 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
   }
 
   const handleClear = () => {
+    ++searchId.current
     setQuery('')
     setResults([])
     setPage(1)
     setHasMore(false)
     setError('')
+    setLoading(false)
+    setLoadingMsg('')
+    setImportStats(null)
     clearTimeout(debounce.current)
   }
 
