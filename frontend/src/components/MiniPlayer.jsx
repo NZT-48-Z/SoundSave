@@ -6,7 +6,10 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(track.duration || 0)
+  const [barHov, setBarHov] = useState(false)
+  const [isDragging, setIsDragging] = useState(false)
   const barRef = useRef(null)
+  const draggingRef = useRef(false)
 
   useEffect(() => {
     const audio = audioRef.current
@@ -34,11 +37,28 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
     audio.paused ? audio.play() : audio.pause()
   }
 
-  const handleSeek = (e) => {
+  const seekTo = (e) => {
     if (!barRef.current || !duration) return
     const rect = barRef.current.getBoundingClientRect()
     const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width))
-    audioRef.current.currentTime = ratio * duration
+    const time = ratio * duration
+    audioRef.current.currentTime = time
+    setCurrentTime(time)
+  }
+
+  const handleBarMouseDown = (e) => {
+    draggingRef.current = true
+    setIsDragging(true)
+    seekTo(e)
+    const onMove = (mv) => { if (draggingRef.current) seekTo(mv) }
+    const onUp = () => {
+      draggingRef.current = false
+      setIsDragging(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
   }
 
   const progress = duration > 0 ? currentTime / duration : 0
@@ -83,16 +103,29 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
         </span>
         <div
           ref={barRef}
-          onClick={handleSeek}
-          style={{ flex: 1, height: 4, borderRadius: 2, background: neutral[800], cursor: 'pointer', position: 'relative' }}
+          onMouseDown={handleBarMouseDown}
+          onMouseEnter={() => setBarHov(true)}
+          onMouseLeave={() => setBarHov(false)}
+          style={{ flex: 1, height: barHov ? 6 : 4, borderRadius: 3, background: neutral[800], cursor: 'pointer', position: 'relative', transition: 'height 0.15s ease', alignSelf: 'center' }}
         >
           <div style={{
             position: 'absolute', left: 0, top: 0, bottom: 0,
             width: `${progress * 100}%`,
             background: loading ? neutral[600] : accent[500],
-            borderRadius: 2,
-            transition: 'width 0.25s linear',
+            borderRadius: 3,
+            transition: isDragging ? 'none' : 'width 0.25s linear',
           }} />
+          {barHov && duration > 0 && (
+            <div style={{
+              position: 'absolute', top: '50%', left: `${progress * 100}%`,
+              transform: 'translate(-50%, -50%)',
+              width: 12, height: 12, borderRadius: '50%',
+              background: accent[500],
+              boxShadow: '0 0 0 3px rgba(249,115,22,0.25)',
+              pointerEvents: 'none',
+              transition: isDragging ? 'none' : undefined,
+            }} />
+          )}
         </div>
         <span style={{ fontSize: 11, color: text.muted, fontFamily: "'JetBrains Mono', monospace", flexShrink: 0 }}>
           {fmtDuration(Math.floor(duration)) || '--:--'}
