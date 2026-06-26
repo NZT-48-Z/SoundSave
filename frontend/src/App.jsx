@@ -67,12 +67,12 @@ export default function App() {
     if (!activeBatch || activeBatch.size === 0) return
     const batchDls = downloads.filter(d => activeBatch.has(d.id))
     if (batchDls.length === 0) return
-    const terminal = ['done', 'error']
+    const terminal = ['done', 'error', 'cancelled']
     const allDone = batchDls.every(d => terminal.includes(d.status))
     if (allDone && batchDls.length >= activeBatch.size) {
       setBatchReport({
         done: batchDls.filter(d => d.status === 'done'),
-        errors: batchDls.filter(d => d.status === 'error'),
+        errors: batchDls.filter(d => d.status === 'error' || d.status === 'cancelled'),
       })
       setActiveBatch(null)
     }
