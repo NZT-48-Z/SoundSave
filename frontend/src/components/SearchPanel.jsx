@@ -4,11 +4,46 @@ import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtDuration } from '../utils/format'
 import EmptyState from './EmptyState'
 
+function PreviewBtn({ isActive, isPlaying, isLoading, onClick }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onClick() }}
+      title="Preview"
+      style={{
+        position: 'absolute', bottom: 7, left: 7, zIndex: 3,
+        width: 26, height: 26, borderRadius: '50%',
+        background: isActive ? accent[500] : 'rgba(0,0,0,0.65)',
+        backdropFilter: 'blur(4px)',
+        border: `1px solid ${isActive ? 'transparent' : 'rgba(255,255,255,0.15)'}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        cursor: 'pointer', color: 'white', padding: 0,
+        transition: 'background 0.15s',
+      }}
+    >
+      {isActive && isLoading ? (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
+          <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+        </svg>
+      ) : isActive && isPlaying ? (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+          <rect x="5" y="4" width="4" height="16" rx="1"/>
+          <rect x="15" y="4" width="4" height="16" rx="1"/>
+        </svg>
+      ) : (
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="white">
+          <polygon points="5 3 19 12 5 21"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
 const SC_URL = /soundcloud\.com\//i
 const YM_URL = /music\.yandex\.(ru|com)\/playlists\//i
 
-function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
+function TrackCard({ track, isAdded, onAdd, onRemove, index, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [hov, setHov] = useState(false)
+  const isActive = previewTrackId === track.id
 
   return (
     <div
@@ -105,6 +140,15 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
             {fmtDuration(track.duration)}
           </div>
         )}
+
+        {(hov || isActive) && (
+          <PreviewBtn
+            isActive={isActive}
+            isPlaying={isPreviewPlaying}
+            isLoading={previewLoading}
+            onClick={() => onPreview(track)}
+          />
+        )}
       </div>
 
       {/* Info */}
@@ -131,7 +175,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   )
 }
 
-export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
+export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport, onPreview, previewTrackId, isPreviewPlaying, previewLoading }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -314,6 +358,10 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
                   isAdded={isInQueue(track.id)}
                   onAdd={() => handleAdd(track)}
                   onRemove={() => handleRemove(track)}
+                  onPreview={onPreview}
+                  previewTrackId={previewTrackId}
+                  isPreviewPlaying={isPreviewPlaying}
+                  previewLoading={previewLoading}
                 />
               ))}
             </div>
