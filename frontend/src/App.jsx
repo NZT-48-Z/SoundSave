@@ -96,6 +96,7 @@ export default function App() {
         artist: track.artist,
         album: track.album || '',
         genre: track.genre || '',
+        duration: track.duration || 0,
         color: trackColor(track.id),
       }]
     })
@@ -115,6 +116,7 @@ export default function App() {
           artist: t.artist,
           album: t.album || '',
           genre: t.genre || '',
+          duration: t.duration || 0,
           color: trackColor(t.id),
         }))
       return fresh.length ? [...prev, ...fresh] : prev
@@ -131,6 +133,9 @@ export default function App() {
   }, [])
 
   const clearQueue = useCallback(() => setQueue([]), [])
+
+  const openYandexModal = useCallback(() => setShowYandexModal(true), [])
+  const openImportModal = useCallback(() => setShowImportModal(true), [])
 
   const onClearHistory = useCallback(async () => {
     await clearHistory()
@@ -294,8 +299,8 @@ export default function App() {
             showToast={showToast}
             yandexConnected={yandexConnected}
             onYandexConnected={handleYandexAuthSuccess}
-            onOpenYandexAuth={() => setShowYandexModal(true)}
-            onOpenImport={() => setShowImportModal(true)}
+            onOpenYandexAuth={openYandexModal}
+            onOpenImport={openImportModal}
           />
         </div>
         {activeTab === 'queue' && (
