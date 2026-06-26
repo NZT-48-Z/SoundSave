@@ -134,14 +134,13 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index }) {
   )
 }
 
-export default function SearchPanel({ onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
+export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
   const [importStats, setImportStats] = useState(null)
   const [error, setError] = useState('')
-  const [added, setAdded] = useState(new Set())
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const pendingYandexUrl = useRef(null)
@@ -209,20 +208,19 @@ export default function SearchPanel({ onAddToQueue, onRemoveFromQueue, showToast
 
   const handleAdd = (track) => {
     onAddToQueue(track)
-    setAdded(prev => new Set(prev).add(track.id))
   }
 
   const handleRemove = (track) => {
     onRemoveFromQueue(track.id)
-    setAdded(prev => { const s = new Set(prev); s.delete(track.id); return s })
   }
+
+  const isInQueue = (id) => queue.some(q => q.id === id)
 
   const handleAddAll = () => {
-    const toAdd = results.filter(t => !added.has(t.id))
-    toAdd.forEach(t => handleAdd(t))
+    results.filter(t => !isInQueue(t.id)).forEach(t => handleAdd(t))
   }
 
-  const addAllCount = results.filter(t => !added.has(t.id)).length
+  const addAllCount = results.filter(t => !isInQueue(t.id)).length
 
   const goToPage = (p) => {
     doSearch(currentQuery.current || query, p)
@@ -317,7 +315,7 @@ export default function SearchPanel({ onAddToQueue, onRemoveFromQueue, showToast
                   key={track.id}
                   track={track}
                   index={index}
-                  isAdded={added.has(track.id)}
+                  isAdded={isInQueue(track.id)}
                   onAdd={() => handleAdd(track)}
                   onRemove={() => handleRemove(track)}
                 />

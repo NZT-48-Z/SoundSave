@@ -67,12 +67,12 @@ export default function App() {
     if (!activeBatch || activeBatch.size === 0) return
     const batchDls = downloads.filter(d => activeBatch.has(d.id))
     if (batchDls.length === 0) return
-    const terminal = ['done', 'error']
+    const terminal = ['done', 'error', 'cancelled']
     const allDone = batchDls.every(d => terminal.includes(d.status))
     if (allDone && batchDls.length >= activeBatch.size) {
       setBatchReport({
         done: batchDls.filter(d => d.status === 'done'),
-        errors: batchDls.filter(d => d.status === 'error'),
+        errors: batchDls.filter(d => d.status === 'error' || d.status === 'cancelled'),
       })
       setActiveBatch(null)
     }
@@ -286,9 +286,9 @@ export default function App() {
 
       {/* MAIN */}
       <main style={{ flex: 1, maxWidth: 1200, margin: '0 auto', padding: '28px 24px', width: '100%' }}>
-        <div key={activeTab} style={{ animation: 'panelIn 0.28s cubic-bezier(0.16,1,0.3,1) both' }}>
-        {activeTab === 'search' && (
+        <div style={{ display: activeTab === 'search' ? 'block' : 'none' }}>
           <SearchPanel
+            queue={queue}
             onAddToQueue={addToQueue}
             onRemoveFromQueue={removeFromQueue}
             showToast={showToast}
@@ -297,21 +297,24 @@ export default function App() {
             onOpenYandexAuth={() => setShowYandexModal(true)}
             onOpenImport={() => setShowImportModal(true)}
           />
-        )}
+        </div>
         {activeTab === 'queue' && (
-          <QueuePanel
-            queue={queue}
-            onRemove={removeFromQueue}
-            onUpdate={updateQueueItem}
-            onClear={clearQueue}
-            onDownloaded={onDownloaded}
-            showToast={showToast}
-          />
+          <div key="queue" style={{ animation: 'panelIn 0.28s cubic-bezier(0.16,1,0.3,1) both' }}>
+            <QueuePanel
+              queue={queue}
+              onRemove={removeFromQueue}
+              onUpdate={updateQueueItem}
+              onClear={clearQueue}
+              onDownloaded={onDownloaded}
+              showToast={showToast}
+            />
+          </div>
         )}
         {activeTab === 'downloads' && (
-          <DownloadsPanel downloads={downloads} onClearHistory={onClearHistory} />
+          <div key="downloads" style={{ animation: 'panelIn 0.28s cubic-bezier(0.16,1,0.3,1) both' }}>
+            <DownloadsPanel downloads={downloads} onClearHistory={onClearHistory} />
+          </div>
         )}
-        </div>
       </main>
 
       {showImportModal && (
