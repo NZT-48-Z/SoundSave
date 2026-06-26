@@ -12,6 +12,11 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
   const draggingRef = useRef(false)
 
   useEffect(() => {
+    setDuration(track.duration || 0)
+    setCurrentTime(0)
+  }, [track.duration])
+
+  useEffect(() => {
     const audio = audioRef.current
     const onPlay = () => setPlaying(true)
     const onPause = () => setPlaying(false)
@@ -115,7 +120,7 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
             borderRadius: 3,
             transition: isDragging ? 'none' : 'width 0.25s linear',
           }} />
-          {barHov && duration > 0 && (
+          {(barHov || isDragging) && duration > 0 && (
             <div style={{
               position: 'absolute', top: '50%', left: `${progress * 100}%`,
               transform: 'translate(-50%, -50%)',
