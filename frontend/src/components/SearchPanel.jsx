@@ -145,7 +145,7 @@ function AddButton({ isAdded, onAdd }) {
   )
 }
 
-export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth }) {
+export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, onYandexConnected, onOpenYandexAuth, onOpenImport }) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -247,13 +247,18 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
     <>
       <div style={{ animation: 'fadeIn 0.2s ease' }}>
         {/* Search bar */}
-        <div style={{ position: 'relative', marginBottom: 24 }}>
-          <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#52525b', display: 'flex', pointerEvents: 'none' }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
+        <div style={{ marginBottom: 24 }}>
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: '#52525b', display: 'flex', pointerEvents: 'none' }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+              </svg>
+            </div>
+            <SearchInput value={query} onChange={handleInput} loading={loading} />
           </div>
-          <SearchInput value={query} onChange={handleInput} loading={loading} />
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 9 }}>
+            <ImportListBtn onClick={onOpenImport} />
+          </div>
         </div>
 
         {/* Results toolbar */}
@@ -335,11 +340,19 @@ export default function SearchPanel({ onAddToQueue, showToast, yandexConnected, 
 
         {/* Empty state */}
         {!loading && results.length === 0 && !query.trim() && !error && (
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '88px 0', gap: 14, textAlign: 'center' }}>
-            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '120px 0 180px', gap: 14, textAlign: 'center', overflow: 'hidden' }}>
+            <div style={{
+              position: 'absolute', inset: 0,
+              backgroundImage: 'radial-gradient(circle, #2e2e32 1px, transparent 1px)',
+              backgroundSize: '28px 28px',
+              WebkitMaskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+              maskImage: 'radial-gradient(ellipse 80% 75% at 50% 50%, black 20%, transparent 80%)',
+              pointerEvents: 'none',
+            }} />
+            <svg width="52" height="52" viewBox="0 0 24 24" fill="none" stroke="#3f3f46" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'relative' }}>
               <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
             </svg>
-            <div>
+            <div style={{ position: 'relative' }}>
               <p style={{ fontSize: 15, color: '#52525b', fontWeight: 500, marginBottom: 6 }}>Search for music</p>
               <p style={{ fontSize: 13, color: '#3f3f46', maxWidth: 320, lineHeight: 1.6 }}>Paste a SoundCloud or Yandex Music URL, or type a track or artist name</p>
             </div>
@@ -432,6 +445,36 @@ function NavBtn({ disabled, onClick, children }) {
       }}
     >
       {children}
+    </button>
+  )
+}
+
+function ImportListBtn({ onClick }) {
+  const [hov, setHov] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        background: 'transparent', border: 'none',
+        color: hov ? text.secondary : text.muted,
+        fontSize: 12, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', gap: 5,
+        padding: '3px 0',
+        fontFamily: "'Space Grotesk', sans-serif",
+        transition: 'color 0.15s',
+      }}
+    >
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+        <line x1="8" y1="6" x2="21" y2="6"/>
+        <line x1="8" y1="12" x2="21" y2="12"/>
+        <line x1="8" y1="18" x2="21" y2="18"/>
+        <line x1="3" y1="6" x2="3.01" y2="6"/>
+        <line x1="3" y1="12" x2="3.01" y2="12"/>
+        <line x1="3" y1="18" x2="3.01" y2="18"/>
+      </svg>
+      Import list
     </button>
   )
 }

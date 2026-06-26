@@ -5,6 +5,7 @@ import DownloadReportModal from './components/DownloadReportModal'
 import DownloadsPanel from './components/DownloadsPanel'
 import QueuePanel from './components/QueuePanel'
 import SearchPanel from './components/SearchPanel'
+import ImportTracklistModal from './components/ImportTracklistModal'
 import YandexAuthModal from './components/YandexAuthModal'
 
 function trackColor(id) {
@@ -46,6 +47,7 @@ export default function App() {
   const [activeBatch, setActiveBatch] = useState(null) // Set of backend download IDs
   const [batchReport, setBatchReport] = useState(null) // {done: [], errors: []}
   const [showYandexModal, setShowYandexModal] = useState(false)
+  const [showImportModal, setShowImportModal] = useState(false)
   const pollRef = useRef(null)
 
   useEffect(() => {
@@ -98,6 +100,26 @@ export default function App() {
       }]
     })
     showToast(`${track.title} — added to queue`)
+  }, [showToast])
+
+  const addBatchToQueue = useCallback((tracks) => {
+    setQueue(prev => {
+      const existingIds = new Set(prev.map(i => i.id))
+      const fresh = tracks
+        .filter(t => !existingIds.has(t.id))
+        .map(t => ({
+          id: t.id,
+          url: t.url,
+          artwork_url: t.artwork_url || null,
+          title: t.title,
+          artist: t.artist,
+          album: t.album || '',
+          genre: t.genre || '',
+          color: trackColor(t.id),
+        }))
+      return fresh.length ? [...prev, ...fresh] : prev
+    })
+    showToast(`${tracks.length} track${tracks.length !== 1 ? 's' : ''} added to queue`)
   }, [showToast])
 
   const removeFromQueue = useCallback((id) => {
@@ -251,6 +273,7 @@ export default function App() {
             yandexConnected={yandexConnected}
             onYandexConnected={handleYandexAuthSuccess}
             onOpenYandexAuth={() => setShowYandexModal(true)}
+            onOpenImport={() => setShowImportModal(true)}
           />
         )}
         {activeTab === 'queue' && (
@@ -269,6 +292,12 @@ export default function App() {
         </div>
       </main>
 
+      {showImportModal && (
+        <ImportTracklistModal
+          onClose={() => setShowImportModal(false)}
+          onBatchAdd={addBatchToQueue}
+        />
+      )}
       {showYandexModal && (
         <YandexAuthModal
           isConnected={yandexConnected}

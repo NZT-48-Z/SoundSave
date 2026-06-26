@@ -1,3 +1,4 @@
+from typing import Literal
 from pydantic import BaseModel
 
 
@@ -26,3 +27,18 @@ class ResolveResponse(BaseModel):
     artwork_url: str | None = None
     genre: str | None = None
     tracks: list[TrackInfo] | None = None
+
+
+class BatchImportItem(BaseModel):
+    type: Literal['url', 'query']
+    value: str
+
+
+class BatchImportRequest(BaseModel):
+    items: list[BatchImportItem]
+
+
+class BatchImportResultItem(BaseModel):
+    value: str
+    track: TrackInfo | None = None
+    error: str | None = None

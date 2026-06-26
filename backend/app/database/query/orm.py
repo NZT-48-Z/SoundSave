@@ -40,7 +40,7 @@ class AsyncORM:
     async def clear_finished_downloads(db: AsyncSession) -> int:
         """Delete everything except actively pending items in the current queue."""
         result = await db.execute(
-            delete(Download).where(Download.status.in_(["done", "error", "downloading", "converting", "tagging"]))
+            delete(Download).where(Download.status.in_(["done", "error", "cancelled", "downloading", "converting", "tagging"]))
         )
         await db.flush()
         return result.rowcount
