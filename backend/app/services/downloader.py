@@ -109,11 +109,11 @@ def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.Abstrac
             )
         elif status == "finished":
             found_path.append(d.get("filename", ""))
-            # Download done, FFmpeg converting now → 85%
-            asyncio.run_coroutine_threadsafe(
-                _update_db(download_id, status="converting", progress=85, speed=None),
-                loop,
-            )
+            if download_id not in _cancelled_ids:
+                asyncio.run_coroutine_threadsafe(
+                    _update_db(download_id, status="converting", progress=85, speed=None),
+                    loop,
+                )
 
     batch_path = os.path.join(DOWNLOAD_DIR, batch_dir)
     os.makedirs(batch_path, exist_ok=True)
@@ -145,6 +145,9 @@ def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.Abstrac
     except yt_dlp.utils.DownloadError as e:
         raise DownloadError(_clean_error(str(e))) from e
 
+    if download_id in _cancelled_ids:
+        raise DownloadError("Cancelled by user")
+
     # FFmpeg done → 90%, writing tags next
     asyncio.run_coroutine_threadsafe(
         _update_db(download_id, status="tagging", progress=90, speed=None),
@@ -169,6 +172,24 @@ async def _update_db(download_id: str, **fields) -> None:
     async with async_session_factory() as session:
         await AsyncORM.update_download(session, download_id, **fields)
         await session.commit()
+
+
+def _cleanup_partial_files(batch_dir: str, safe_title: str) -> None:
+    """Remove any leftover files from a cancelled or failed download."""
+    dir_path = os.path.join(DOWNLOAD_DIR, batch_dir)
+    if not os.path.isdir(dir_path):
+        return
+    try:
+        for filename in os.listdir(dir_path):
+            if filename.startswith(safe_title + "."):
+                filepath = os.path.join(dir_path, filename)
+                try:
+                    os.remove(filepath)
+                    logger.debug("Removed partial file: %s", filepath)
+                except OSError as e:
+                    logger.warning("Could not remove partial file %s: %s", filepath, e)
+    except OSError:
+        pass
 
 
 def _cleanup_batch_dir_if_empty(batch_dir: str) -> None:
@@ -238,6 +259,7 @@ class DownloadQueue:
                             os.remove(mp3_path)
                         except OSError:
                             pass
+                    await _update_db(download_id, status="cancelled", finished_at=datetime.utcnow(), speed=None)
                     continue
 
                 await _update_db(
@@ -252,8 +274,9 @@ class DownloadQueue:
                 logger.info("Download done: %s", mp3_path)
             except Exception as e:
                 if download_id in _cancelled_ids:
-                    # Status already set to 'cancelled' by cancel(), don't overwrite
                     _cancelled_ids.discard(download_id)
+                    _cleanup_partial_files(batch_dir, _safe_filename(meta.title))
+                    await _update_db(download_id, status="cancelled", finished_at=datetime.utcnow(), speed=None)
                     logger.info("Download cancelled: %s", download_id)
                 else:
                     logger.error("Download failed [%s]: %s", download_id, e)
