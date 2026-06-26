@@ -28,7 +28,7 @@ function Toast({ toasts }) {
           animation: 'toastIn 0.2s ease', boxShadow: '0 4px 24px rgba(0,0,0,0.5)',
           maxWidth: 300, pointerEvents: 'all',
         }}>
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || '#22c55e'} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={t.iconColor || semantic.success} strokeWidth="2.5" strokeLinecap="round" style={{ flexShrink: 0 }}>
             <polyline points="20 6 9 17 4 12"/>
           </svg>
           <span style={{ lineHeight: 1.4 }}>{t.msg}</span>
@@ -80,7 +80,7 @@ export default function App() {
 
   const showToast = useCallback((msg, type = 'success') => {
     const id = Date.now() + Math.random()
-    const iconColor = { success: '#22c55e', info: '#3b82f6', error: '#ef4444' }[type] || '#22c55e'
+    const iconColor = { success: semantic.success, info: semantic.info, error: semantic.error }[type] || semantic.success
     setToasts(prev => [...prev, { id, msg, iconColor }])
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 2600)
   }, [])
@@ -216,7 +216,7 @@ export default function App() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginRight: 16, flexShrink: 0 }}>
             <div style={{
               width: 30, height: 30, borderRadius: 8,
-              background: 'linear-gradient(135deg, #f97316, #c2410c)',
+              background: `linear-gradient(135deg, ${accent[500]}, ${accent[700]})`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               boxShadow: '0 2px 12px rgba(249,115,22,0.4)',
             }}>
