@@ -96,7 +96,10 @@ export async function clearHistory() {
 
 export async function getPreviewUrl(url) {
   const r = await fetch(`${BASE}/preview?url=${encodeURIComponent(url)}`)
-  if (!r.ok) throw new Error(await r.text())
+  if (!r.ok) {
+    const data = await r.json().catch(() => null)
+    throw new Error(data?.detail || 'Preview failed')
+  }
   return r.json() // { stream_url, duration }
 }
 
