@@ -7,6 +7,7 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(track.duration || 0)
   const [barHov, setBarHov] = useState(false)
+  const [playHov, setPlayHov] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [coverOpen, setCoverOpen] = useState(false)
   const [coverHov, setCoverHov] = useState(false)
@@ -180,15 +181,17 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
         <button
           onClick={togglePlay}
           disabled={loading}
+          onMouseEnter={() => { if (!loading) setPlayHov(true) }}
+          onMouseLeave={() => setPlayHov(false)}
           style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: loading ? neutral[800] : accent[500],
+            background: loading ? neutral[800] : playHov ? accent[600] : accent[500],
             border: 'none', cursor: loading ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s',
+            transition: 'background 0.15s, transform 0.15s, box-shadow 0.15s',
+            transform: playHov && !loading ? 'scale(1.08)' : 'scale(1)',
+            boxShadow: playHov && !loading ? '0 0 0 6px rgba(249,115,22,0.18)' : 'none',
           }}
-          onMouseEnter={e => { if (!loading) e.currentTarget.style.background = accent[600] }}
-          onMouseLeave={e => { if (!loading) e.currentTarget.style.background = loading ? neutral[800] : accent[500] }}
         >
           {loading ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
