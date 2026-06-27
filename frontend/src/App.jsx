@@ -211,7 +211,12 @@ export default function App() {
     } catch (err) {
       if (err?.name !== 'AbortError') {
         console.error('Preview failed:', err)
-        showToast('Preview not available', 'error')
+        const msg = err?.message || ''
+        const friendly = msg.includes('DRM') ? 'Track is DRM-protected — preview unavailable'
+          : msg.includes('No stream') ? 'No audio stream available for this track'
+          : msg.includes('Could not resolve') ? 'Could not load track'
+          : 'Preview not available'
+        showToast(friendly, 'error')
         setCurrentPreview(null)
         audio.src = ''
       }
