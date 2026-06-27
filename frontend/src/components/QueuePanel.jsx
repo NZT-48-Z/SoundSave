@@ -5,7 +5,7 @@ import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
 import EmptyState from './EmptyState'
 import { isModifiedTitle } from '../utils/trackModifiers'
-import { fmtDuration } from '../utils/format'
+import { fmtDuration, fmtTotalDuration } from '../utils/format'
 
 const COLS = '20px 32px 44px 1fr 1fr 150px 110px 50px 28px 28px'
 
@@ -112,8 +112,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   }
 
   const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
-  const queueTotalMins = Math.floor(queueTotalSecs / 60)
-  const queueTotalDuration = queueTotalMins > 0 ? `${queueTotalMins} min` : null
+  const queueTotalDuration = queueTotalSecs > 0 ? fmtTotalDuration(queueTotalSecs) : null
 
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
@@ -135,7 +134,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{queue.length} tracks in queue</span>
           {queueTotalDuration && (
-            <span style={{ fontSize: 12, color: text.muted }}>· {queueTotalDuration}</span>
+            <span style={{ fontSize: 12, color: text.muted }}>· {queueTotalDuration} min</span>
           )}
           <ToolbarBtn onClick={toggleAll}>{allSelected ? 'Deselect All' : 'Select All'}</ToolbarBtn>
         </div>
@@ -366,8 +365,6 @@ function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging,
   const [playHov, setPlayHov] = useState(false)
   return (
     <div
-      draggable
-      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver() }}
       onDrop={(e) => { e.preventDefault(); onDrop() }}
       onDragEnd={onDragEnd}
@@ -388,11 +385,14 @@ function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging,
       }}>
 
       {/* Drag handle */}
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: rowHov ? neutral[600] : 'transparent',
-        cursor: 'grab', transition: 'color 0.1s', userSelect: 'none',
-      }}>
+      <div
+        draggable
+        onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: rowHov ? neutral[600] : 'transparent',
+          cursor: 'grab', transition: 'color 0.1s', userSelect: 'none',
+        }}>
         <svg width="10" height="14" viewBox="0 0 10 14" fill="currentColor">
           <circle cx="3" cy="2.5" r="1.2"/>
           <circle cx="7" cy="2.5" r="1.2"/>
