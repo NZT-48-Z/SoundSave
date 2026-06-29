@@ -9,19 +9,19 @@ logger = logging.getLogger(__name__)
 
 # Patterns that indicate a modified/non-original track
 _MOD_PATTERN = re.compile(
-    r'\b(slowed|reverb|sped[\s_-]?up|speed[\s_-]?up|nightcore|8d[\s_-]?audio|'
-    r'bass[\s_-]?boost(ed)?|lo[\s_-]?fi|pitched|slowed[\s_-]?down|'
-    r'tiktok|tik[\s_-]?tok|phone[\s_-]?quality)\b',
+    r"\b(slowed|reverb|sped[\s_-]?up|speed[\s_-]?up|nightcore|8d[\s_-]?audio|"
+    r"bass[\s_-]?boost(ed)?|lo[\s_-]?fi|pitched|slowed[\s_-]?down|"
+    r"tiktok|tik[\s_-]?tok|phone[\s_-]?quality)\b",
     re.I,
 )
 
 # Remove parenthesised / bracketed / dashed modifiers from the end of a title
 _CLEAN_PATTERN = re.compile(
-    r'[\s\-–]+[\(\[\|]?\s*'
-    r'(slowed[\s&+]*reverb|slowed[\s&+]*reverbed|slowed|reverb(ed)?|sped[\s_-]?up|'
-    r'speed[\s_-]?up|nightcore|8d[\s_-]?audio|bass[\s_-]?boost(ed)?|'
-    r'lo[\s_-]?fi|pitched|slowed[\s_-]?down)'
-    r'[^\)\]]*[\)\]]?',
+    r"[\s\-–]+[\(\[\|]?\s*"
+    r"(slowed[\s&+]*reverb|slowed[\s&+]*reverbed|slowed|reverb(ed)?|sped[\s_-]?up|"
+    r"speed[\s_-]?up|nightcore|8d[\s_-]?audio|bass[\s_-]?boost(ed)?|"
+    r"lo[\s_-]?fi|pitched|slowed[\s_-]?down)"
+    r"[^\)\]]*[\)\]]?",
     re.I,
 )
 
@@ -31,8 +31,8 @@ def is_modified_title(title: str) -> bool:
 
 
 def clean_title(title: str) -> str:
-    cleaned = _CLEAN_PATTERN.sub('', title)
-    return cleaned.strip(' -–|([')
+    cleaned = _CLEAN_PATTERN.sub("", title)
+    return cleaned.strip(" -–|([")
 
 
 def search_alternatives(title: str, artist: str, limit: int = 6) -> list[dict]:
@@ -44,6 +44,7 @@ def search_alternatives(title: str, artist: str, limit: int = 6) -> list[dict]:
     originals = [r for r in results if not is_modified_title(r["title"])]
     modified = [r for r in results if is_modified_title(r["title"])]
     return (originals + modified)[:limit]
+
 
 _YDL_BASE_OPTS = {
     "quiet": True,
@@ -107,7 +108,9 @@ def get_preview_url(url: str) -> dict:
             if not stream_url:
                 formats = result.get("formats") or []
                 for fmt in reversed(formats):
-                    if fmt.get("protocol") in ("https", "http") and fmt.get("vcodec") in (None, "none"):
+                    if fmt.get("protocol") in ("https", "http") and fmt.get(
+                        "vcodec"
+                    ) in (None, "none"):
                         stream_url = fmt.get("url")
                         break
                 if not stream_url and formats:
@@ -135,7 +138,9 @@ def resolve_url(url: str) -> dict:
             if result.get("_type") == "playlist":
                 entries = result.get("entries", [])
                 thumbnails = result.get("thumbnails") or []
-                artwork = thumbnails[-1].get("url") if thumbnails else result.get("thumbnail")
+                artwork = (
+                    thumbnails[-1].get("url") if thumbnails else result.get("thumbnail")
+                )
                 return {
                     "type": "playlist",
                     "title": result.get("title", "Unknown Playlist"),
