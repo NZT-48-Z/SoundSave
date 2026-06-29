@@ -113,6 +113,9 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
 
   const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
   const queueTotalDuration = queueTotalSecs > 0 ? fmtTotalDuration(queueTotalSecs) : null
+  const queueTotalDurationLabel = queueTotalDuration
+    ? `${queueTotalDuration}${queueTotalSecs >= 3600 ? '' : ' min'}`
+    : null
 
   return (
     <div style={{ animation: 'fadeIn 0.2s ease' }}>
@@ -133,8 +136,8 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 14, fontWeight: 600 }}>{queue.length} tracks in queue</span>
-          {queueTotalDuration && (
-            <span style={{ fontSize: 12, color: text.muted }}>· {queueTotalDuration} min</span>
+          {queueTotalDurationLabel && (
+            <span style={{ fontSize: 12, color: text.muted }}>· {queueTotalDurationLabel}</span>
           )}
           <ToolbarBtn onClick={toggleAll}>{allSelected ? 'Deselect All' : 'Select All'}</ToolbarBtn>
         </div>
