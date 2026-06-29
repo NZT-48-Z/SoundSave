@@ -30,7 +30,7 @@ class ResolveResponse(BaseModel):
 
 
 class BatchImportItem(BaseModel):
-    type: Literal['url', 'query']
+    type: Literal["url", "query"]
     value: str
 
 
