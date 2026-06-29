@@ -5,6 +5,7 @@ from app.core.config import settings
 
 
 def configure_logging() -> None:
+    """Настройка логгера"""
     level = logging.DEBUG if settings.DEBUG else logging.INFO
     fmt = "[%(asctime)s.%(msecs)03d] %(module)12s:%(lineno)-3d %(levelname)-7s - %(message)s"
     datefmt = "%Y-%m-%d %H:%M:%S"
