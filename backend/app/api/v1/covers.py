@@ -11,7 +11,12 @@ router = APIRouter()
 COVERS_DIR = os.path.join(os.path.expanduser(settings.DOWNLOAD_DIR), ".covers")
 os.makedirs(COVERS_DIR, exist_ok=True)
 
-_EXT_TO_MIME = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
+_EXT_TO_MIME = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
 
 
 @router.post("/upload/cover")
