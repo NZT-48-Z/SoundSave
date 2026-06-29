@@ -7,7 +7,10 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(track.duration || 0)
   const [barHov, setBarHov] = useState(false)
+  const [playHov, setPlayHov] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [coverOpen, setCoverOpen] = useState(false)
+  const [coverHov, setCoverHov] = useState(false)
   const barRef = useRef(null)
   const draggingRef = useRef(false)
 
@@ -66,9 +69,17 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
     window.addEventListener('mouseup', onUp)
   }
 
+  useEffect(() => {
+    if (!coverOpen) return
+    const onKey = (e) => { if (e.key === 'Escape') setCoverOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [coverOpen])
+
   const progress = duration > 0 ? currentTime / duration : 0
 
   return (
+    <>
     <div style={{
       position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 200,
       background: 'rgba(12,12,16,0.97)',
@@ -79,13 +90,40 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
       animation: 'slideUp 0.22s cubic-bezier(0.16,1,0.3,1)',
     }}>
       {/* Artwork */}
-      <div style={{ width: 44, height: 44, borderRadius: 7, overflow: 'hidden', flexShrink: 0, background: neutral[900] }}>
+      <div
+        onClick={() => track.artwork_url && setCoverOpen(true)}
+        onMouseEnter={() => track.artwork_url && setCoverHov(true)}
+        onMouseLeave={() => setCoverHov(false)}
+        style={{
+          width: 44, height: 44, borderRadius: 7, overflow: 'hidden', flexShrink: 0,
+          background: neutral[900], cursor: track.artwork_url ? 'zoom-in' : 'default',
+          position: 'relative',
+          transform: coverHov ? 'scale(1.08)' : 'scale(1)',
+          transition: 'transform 0.18s ease',
+          boxShadow: coverHov ? '0 4px 16px rgba(0,0,0,0.5)' : 'none',
+        }}
+      >
         {track.artwork_url ? (
           <img src={track.artwork_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
           <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="1.5" strokeLinecap="round">
               <path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>
+            </svg>
+          </div>
+        )}
+        {coverHov && (
+          <div style={{
+            position: 'absolute', inset: 0,
+            background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            transition: 'opacity 0.18s ease',
+          }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              <line x1="11" y1="8" x2="11" y2="14"/>
+              <line x1="8" y1="11" x2="14" y2="11"/>
             </svg>
           </div>
         )}
@@ -143,15 +181,17 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
         <button
           onClick={togglePlay}
           disabled={loading}
+          onMouseEnter={() => { if (!loading) setPlayHov(true) }}
+          onMouseLeave={() => setPlayHov(false)}
           style={{
             width: 36, height: 36, borderRadius: '50%',
-            background: loading ? neutral[800] : accent[500],
+            background: loading ? neutral[800] : playHov ? accent[600] : accent[500],
             border: 'none', cursor: loading ? 'default' : 'pointer',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            transition: 'background 0.15s',
+            transition: 'background 0.15s, transform 0.15s, box-shadow 0.15s',
+            transform: playHov && !loading ? 'scale(1.08)' : 'scale(1)',
+            boxShadow: playHov && !loading ? '0 0 0 6px rgba(249,115,22,0.18)' : 'none',
           }}
-          onMouseEnter={e => { if (!loading) e.currentTarget.style.background = accent[600] }}
-          onMouseLeave={e => { if (!loading) e.currentTarget.style.background = loading ? neutral[800] : accent[500] }}
         >
           {loading ? (
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.5)" strokeWidth="2.5" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite' }}>
@@ -187,6 +227,29 @@ export default function MiniPlayer({ track, audioRef, loading, onClose }) {
         </button>
       </div>
     </div>
+
+    {coverOpen && track.artwork_url && (
+      <div
+        onClick={() => setCoverOpen(false)}
+        style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          background: 'rgba(0,0,0,0.85)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          animation: 'fadeIn 0.2s ease', cursor: 'zoom-out',
+        }}
+      >
+        <img
+          src={track.artwork_url}
+          alt={track.title}
+          style={{ width: 400, height: 400, objectFit: 'cover', borderRadius: 14, boxShadow: '0 24px 80px rgba(0,0,0,0.7)' }}
+        />
+        <div style={{ marginTop: 16, textAlign: 'center' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: '#fff' }}>{track.title}</div>
+          {track.artist && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.5)', marginTop: 4 }}>{track.artist}</div>}
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 

@@ -15,6 +15,7 @@ def get_ffmpeg_location() -> str | None:
     path = shutil.which("ffmpeg")
     if path:
         import os
+
         _ffmpeg_dir = os.path.dirname(path)
         logger.info("Using system ffmpeg: %s", path)
         return _ffmpeg_dir
@@ -22,10 +23,12 @@ def get_ffmpeg_location() -> str | None:
     # 2. static-ffmpeg (auto-downloads binaries on first run)
     try:
         import static_ffmpeg
+
         static_ffmpeg.add_paths()
         path = shutil.which("ffmpeg")
         if path:
             import os
+
             _ffmpeg_dir = os.path.dirname(path)
             logger.info("Using static-ffmpeg: %s", path)
             return _ffmpeg_dir
@@ -36,6 +39,7 @@ def get_ffmpeg_location() -> str | None:
     try:
         import imageio_ffmpeg
         import os
+
         exe = imageio_ffmpeg.get_ffmpeg_exe()
         _ffmpeg_dir = os.path.dirname(exe)
         logger.info("Using imageio-ffmpeg: %s", exe)
@@ -43,5 +47,7 @@ def get_ffmpeg_location() -> str | None:
     except Exception as e:
         logger.warning("imageio-ffmpeg not available: %s", e)
 
-    logger.error("ffmpeg not found — install with: .venv\\Scripts\\pip install static-ffmpeg")
+    logger.error(
+        "ffmpeg not found — install with: .venv\\Scripts\\pip install static-ffmpeg"
+    )
     return None

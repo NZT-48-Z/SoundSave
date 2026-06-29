@@ -34,6 +34,7 @@ def delete_token() -> None:
 
 def _request_code_sync() -> dict:
     from yandex_music import Client
+
     client = Client().init()
     code = client.request_device_code()
     return {
@@ -49,6 +50,7 @@ def _poll_token_sync(device_code: str, interval: float) -> str | None:
     """Poll until token received or 300s timeout. Returns token string or raises."""
     import time
     from yandex_music import Client
+
     client = Client().init()
     deadline = time.monotonic() + 300
     while time.monotonic() < deadline:
@@ -73,7 +75,9 @@ async def start_device_auth() -> dict:
     }
 
     # Start background polling task
-    asyncio.create_task(_poll_session(session_id, code_info["device_code"], code_info["interval"]))
+    asyncio.create_task(
+        _poll_session(session_id, code_info["device_code"], code_info["interval"])
+    )
 
     return {
         "session_id": session_id,

@@ -3,7 +3,7 @@ import re
 
 logger = logging.getLogger(__name__)
 
-_UUID_RE = re.compile(r'playlists/([0-9a-f\-]{36})', re.I)
+_UUID_RE = re.compile(r"playlists/([0-9a-f\-]{36})", re.I)
 
 
 def _extract_uuid(url: str) -> str | None:
@@ -38,18 +38,28 @@ def fetch_yandex_playlist(url: str) -> list[dict]:
     for item in playlist.tracks or []:
         try:
             # In v3, playlist.tracks may be TrackShort objects — fetch full track if needed
-            track = item.fetch_track() if hasattr(item, 'fetch_track') and not hasattr(item, 'duration_ms') else item
+            track = (
+                item.fetch_track()
+                if hasattr(item, "fetch_track") and not hasattr(item, "duration_ms")
+                else item
+            )
 
-            artists = ', '.join(a.name for a in (track.artists or [])) or 'Unknown'
-            album = track.albums[0].title if getattr(track, 'albums', None) else None
-            duration = int(track.duration_ms / 1000) if getattr(track, 'duration_ms', None) else None
+            artists = ", ".join(a.name for a in (track.artists or [])) or "Unknown"
+            album = track.albums[0].title if getattr(track, "albums", None) else None
+            duration = (
+                int(track.duration_ms / 1000)
+                if getattr(track, "duration_ms", None)
+                else None
+            )
 
-            tracks.append({
-                'title': track.title or 'Unknown',
-                'artist': artists,
-                'album': album,
-                'duration': duration,
-            })
+            tracks.append(
+                {
+                    "title": track.title or "Unknown",
+                    "artist": artists,
+                    "album": album,
+                    "duration": duration,
+                }
+            )
         except Exception as e:
             logger.warning("Skipping track, failed to get info: %s", e)
 

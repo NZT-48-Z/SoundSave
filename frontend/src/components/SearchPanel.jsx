@@ -63,7 +63,7 @@ function TrackCard({ track, isAdded, onAdd, onRemove, index, onPreview, previewT
       onClick={() => isAdded ? onRemove() : onAdd()}
     >
       {/* Artwork */}
-      <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || neutral[900] }}>
+      <div style={{ position: 'relative', width: '100%', paddingBottom: '100%', background: track.color || neutral[900], overflow: 'hidden' }}>
         {track.artwork_url ? (
           <img
             src={track.artwork_url}
