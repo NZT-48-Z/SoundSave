@@ -83,10 +83,10 @@ async def import_yandex(url: str = Query(...)):
                     return None
                 sc = results[0]
                 # Pre-fill album from Yandex metadata
-                if ym_track.get('album'):
-                    sc['album'] = ym_track['album']
-                sc['_ym_title'] = ym_track['title']
-                sc['_ym_artist'] = ym_track['artist']
+                if ym_track.get("album"):
+                    sc["album"] = ym_track["album"]
+                sc["_ym_title"] = ym_track["title"]
+                sc["_ym_artist"] = ym_track["artist"]
                 return sc
             except Exception as e:
                 logger.warning("SoundCloud search failed for '%s': %s", query, e)
@@ -100,7 +100,9 @@ async def import_yandex(url: str = Query(...)):
 
     logger.info(
         "Yandex import: %d/%d tracks found on SoundCloud (%d not found)",
-        len(found), len(ym_tracks), not_found,
+        len(found),
+        len(ym_tracks),
+        not_found,
     )
 
     return {
