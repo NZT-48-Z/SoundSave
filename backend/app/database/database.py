@@ -20,6 +20,7 @@ class Base(DeclarativeBase):
 async def create_tables() -> None:
     async with engine.begin() as conn:
         from app.models import download  # noqa: F401 — registers the model
+
         await conn.run_sync(Base.metadata.create_all)
 
 
