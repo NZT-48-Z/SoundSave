@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { startBulkDownload } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
@@ -47,6 +47,16 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
 
   const allSelected = queue.length > 0 && selected.size === queue.length
   const hasSelected = selected.size > 0
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape' || !hasSelected || bulkCoverOpen || coverPickerId) return
+      setSelected(new Set())
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [bulkCoverOpen, coverPickerId, hasSelected])
 
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(queue.map(i => i.id)))
   const toggle = (id) => {
