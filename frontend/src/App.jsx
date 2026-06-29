@@ -170,6 +170,11 @@ export default function App() {
 
   const updateQueueItem = useCallback((id, updates) => {
     setQueue(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
+    setCurrentPreview(prev => (
+      prev?.trackId === id
+        ? { ...prev, ...updates }
+        : prev
+    ))
   }, [])
 
   const reorderQueue = useCallback((from, to) => {
