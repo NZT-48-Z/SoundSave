@@ -24,18 +24,18 @@ DOWNLOAD_DIR = os.path.expanduser(settings.DOWNLOAD_DIR)
 # IDs that have been requested to cancel. Checked in progress_hook to abort yt-dlp.
 _cancelled_ids: set[str] = set()
 
-_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
 
 def _clean_error(msg: str) -> str:
     """Strip ANSI codes and yt-dlp noise from error messages."""
-    msg = _ANSI_RE.sub('', msg)
+    msg = _ANSI_RE.sub("", msg)
     # Extract the meaningful part after ERROR:
-    match = re.search(r'ERROR:\s*(.*)', msg)
+    match = re.search(r"ERROR:\s*(.*)", msg)
     if match:
         msg = match.group(1).strip()
-    if 'DRM protected' in msg:
-        return 'DRM protected — requires SoundCloud Go+ subscription'
+    if "DRM protected" in msg:
+        return "DRM protected — requires SoundCloud Go+ subscription"
     return msg.strip()
 
 
@@ -64,8 +64,15 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
                 with open(meta.artwork_local_path, "rb") as fh:
                     art_data = fh.read()
                 _ext = os.path.splitext(meta.artwork_local_path)[1].lower().lstrip(".")
-                _mime = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png", "webp": "image/webp"}.get(_ext, "image/jpeg")
-                tags["APIC"] = APIC(encoding=3, mime=_mime, type=3, desc="Cover", data=art_data)
+                _mime = {
+                    "jpg": "image/jpeg",
+                    "jpeg": "image/jpeg",
+                    "png": "image/png",
+                    "webp": "image/webp",
+                }.get(_ext, "image/jpeg")
+                tags["APIC"] = APIC(
+                    encoding=3, mime=_mime, type=3, desc="Cover", data=art_data
+                )
             except Exception as e:
                 logger.warning("Could not read local artwork: %s", e)
         elif meta.artwork_url:
@@ -90,7 +97,12 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
         logger.error("ID3 write failed for %s: %s", filepath, e)
 
 
-def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.AbstractEventLoop, batch_dir: str) -> str:
+def _run_download(
+    download_id: str,
+    meta: DownloadRequest,
+    loop: asyncio.AbstractEventLoop,
+    batch_dir: str,
+) -> str:
     found_path: list[str] = []
 
     def progress_hook(d: dict) -> None:
@@ -104,14 +116,18 @@ def _run_download(download_id: str, meta: DownloadRequest, loop: asyncio.Abstrac
             progress = round(downloaded / total * 80, 1) if total else 0
             speed = d.get("speed")
             asyncio.run_coroutine_threadsafe(
-                _update_db(download_id, status="downloading", progress=progress, speed=speed),
+                _update_db(
+                    download_id, status="downloading", progress=progress, speed=speed
+                ),
                 loop,
             )
         elif status == "finished":
             found_path.append(d.get("filename", ""))
             if download_id not in _cancelled_ids:
                 asyncio.run_coroutine_threadsafe(
-                    _update_db(download_id, status="converting", progress=85, speed=None),
+                    _update_db(
+                        download_id, status="converting", progress=85, speed=None
+                    ),
                     loop,
                 )
 
@@ -259,7 +275,12 @@ class DownloadQueue:
                             os.remove(mp3_path)
                         except OSError:
                             pass
-                    await _update_db(download_id, status="cancelled", finished_at=datetime.utcnow(), speed=None)
+                    await _update_db(
+                        download_id,
+                        status="cancelled",
+                        finished_at=datetime.utcnow(),
+                        speed=None,
+                    )
                     continue
 
                 await _update_db(
@@ -276,7 +297,12 @@ class DownloadQueue:
                 if download_id in _cancelled_ids:
                     _cancelled_ids.discard(download_id)
                     _cleanup_partial_files(batch_dir, _safe_filename(meta.title))
-                    await _update_db(download_id, status="cancelled", finished_at=datetime.utcnow(), speed=None)
+                    await _update_db(
+                        download_id,
+                        status="cancelled",
+                        finished_at=datetime.utcnow(),
+                        speed=None,
+                    )
                     logger.info("Download cancelled: %s", download_id)
                 else:
                     logger.error("Download failed [%s]: %s", download_id, e)
