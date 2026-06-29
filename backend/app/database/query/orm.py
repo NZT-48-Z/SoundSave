@@ -24,9 +24,7 @@ class AsyncORM:
 
     @staticmethod
     async def get_all_downloads(db: AsyncSession) -> Sequence[Download]:
-        result = await db.execute(
-            select(Download).order_by(Download.started_at.desc())
-        )
+        result = await db.execute(select(Download).order_by(Download.started_at.desc()))
         return result.scalars().all()
 
     @staticmethod
@@ -49,7 +47,9 @@ class AsyncORM:
         """On startup: mark any interrupted in-progress records as error."""
         result = await db.execute(
             update(Download)
-            .where(Download.status.in_(["downloading", "converting", "tagging", "pending"]))
+            .where(
+                Download.status.in_(["downloading", "converting", "tagging", "pending"])
+            )
             .values(status="error", error="Interrupted — server was restarted")
         )
         await db.flush()
