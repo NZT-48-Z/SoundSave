@@ -5,6 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1 import router
 from app.core.config import settings
 from app.core.lifespan import lifespan
+from app.core.logger import configure_logging
+
+configure_logging()
 
 app = FastAPI(
     title="SoundSave API",
@@ -35,4 +38,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=settings.PORT,
         reload=settings.DEBUG,
+        log_config=None,
     )
