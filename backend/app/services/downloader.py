@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import subprocess
 import uuid
 from datetime import datetime
 
@@ -12,7 +13,7 @@ from mutagen.id3._util import ID3NoHeaderError
 
 from app.core.config import settings
 from app.core.exceptions import DownloadError
-from app.core.ffmpeg import get_ffmpeg_location
+from app.core.ffmpeg import get_ffmpeg_exe, get_ffmpeg_location
 from app.database.database import async_session_factory
 from app.database.query.orm import AsyncORM
 from app.schemas.download import DownloadRequest
@@ -95,6 +96,23 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
         logger.info("ID3 tags written: %s", filepath)
     except Exception as e:
         logger.error("ID3 write failed for %s: %s", filepath, e)
+
+
+def _cut_audio(filepath: str, start: float | None, end: float | None) -> None:
+    tmp_path = filepath + ".cut.mp3"
+    cmd = [get_ffmpeg_exe(), "-y", "-i", filepath]
+    if start:
+        cmd += ["-ss", str(start)]
+    if end:
+        cmd += ["-to", str(end)]
+    cmd += ["-acodec", "libmp3lame", "-b:a", "320k", tmp_path]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not os.path.exists(tmp_path):
+        raise DownloadError(f"Cut failed: {result.stderr.strip()[-500:]}")
+
+    os.replace(tmp_path, filepath)
+    logger.info("Cut audio: %s (start=%s end=%s)", filepath, start, end)
 
 
 def _run_download(
@@ -181,6 +199,13 @@ def _run_download(
 
     if not os.path.exists(mp3):
         raise DownloadError(f"File not found after download: {mp3}")
+
+    if meta.cut_start or meta.cut_end:
+        asyncio.run_coroutine_threadsafe(
+            _update_db(download_id, status="cutting", progress=87, speed=None),
+            loop,
+        )
+        _cut_audio(mp3, meta.cut_start, meta.cut_end)
 
     _write_id3(mp3, meta)
     return mp3
