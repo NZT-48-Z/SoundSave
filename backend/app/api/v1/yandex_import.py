@@ -96,18 +96,23 @@ async def import_yandex(url: str = Query(...)):
     sc_results = await asyncio.gather(*tasks)
 
     found = [r for r in sc_results if r is not None]
-    not_found = len(ym_tracks) - len(found)
+    not_found_tracks = [
+        {"title": ym["title"], "artist": ym["artist"]}
+        for ym, r in zip(ym_tracks, sc_results)
+        if r is None
+    ]
 
     logger.info(
         "Yandex import: %d/%d tracks found on SoundCloud (%d not found)",
         len(found),
         len(ym_tracks),
-        not_found,
+        len(not_found_tracks),
     )
 
     return {
         "results": found,
         "total": len(ym_tracks),
         "found": len(found),
-        "not_found": not_found,
+        "not_found": len(not_found_tracks),
+        "not_found_tracks": not_found_tracks,
     }
