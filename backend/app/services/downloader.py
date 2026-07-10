@@ -2,6 +2,7 @@ import asyncio
 import logging
 import os
 import re
+import subprocess
 import uuid
 from datetime import datetime
 
@@ -12,7 +13,7 @@ from mutagen.id3._util import ID3NoHeaderError
 
 from app.core.config import settings
 from app.core.exceptions import DownloadError
-from app.core.ffmpeg import get_ffmpeg_location
+from app.core.ffmpeg import get_ffmpeg_exe, get_ffmpeg_location
 from app.database.database import async_session_factory
 from app.database.query.orm import AsyncORM
 from app.schemas.download import DownloadRequest
@@ -97,6 +98,23 @@ def _write_id3(filepath: str, meta: DownloadRequest) -> None:
         logger.error("ID3 write failed for %s: %s", filepath, e)
 
 
+def _cut_audio(filepath: str, start: float | None, end: float | None) -> None:
+    tmp_path = filepath + ".cut.mp3"
+    cmd = [get_ffmpeg_exe(), "-y", "-i", filepath]
+    if start:
+        cmd += ["-ss", str(start)]
+    if end:
+        cmd += ["-to", str(end)]
+    cmd += ["-acodec", "libmp3lame", "-b:a", "320k", tmp_path]
+
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0 or not os.path.exists(tmp_path):
+        raise DownloadError(f"Cut failed: {result.stderr.strip()[-500:]}")
+
+    os.replace(tmp_path, filepath)
+    logger.info("Cut audio: %s (start=%s end=%s)", filepath, start, end)
+
+
 def _run_download(
     download_id: str,
     meta: DownloadRequest,
@@ -104,6 +122,19 @@ def _run_download(
     batch_dir: str,
 ) -> str:
     found_path: list[str] = []
+    max_progress = [0.0]
+    pending_write: list = [None]
+
+    def schedule_update(**fields) -> None:
+        # DB writes for this download are fire-and-forget futures; if two land out of
+        # order (e.g. a slower earlier write commits after a faster later one), the row
+        # can revert to a lower progress value. Waiting for the previous write here
+        # guarantees they land in the same order they were computed.
+        if pending_write[0] is not None:
+            pending_write[0].result()
+        pending_write[0] = asyncio.run_coroutine_threadsafe(
+            _update_db(download_id, **fields), loop
+        )
 
     def progress_hook(d: dict) -> None:
         if download_id in _cancelled_ids:
@@ -113,23 +144,17 @@ def _run_download(
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
             downloaded = d.get("downloaded_bytes", 0)
             # 0-80% = actual download
+            # total_bytes_estimate can be revised up/down by yt-dlp mid-download,
+            # so clamp to the highest value seen to keep the bar from jumping backward.
             progress = round(downloaded / total * 80, 1) if total else 0
+            progress = max(progress, max_progress[0])
+            max_progress[0] = progress
             speed = d.get("speed")
-            asyncio.run_coroutine_threadsafe(
-                _update_db(
-                    download_id, status="downloading", progress=progress, speed=speed
-                ),
-                loop,
-            )
+            schedule_update(status="downloading", progress=progress, speed=speed)
         elif status == "finished":
             found_path.append(d.get("filename", ""))
             if download_id not in _cancelled_ids:
-                asyncio.run_coroutine_threadsafe(
-                    _update_db(
-                        download_id, status="converting", progress=85, speed=None
-                    ),
-                    loop,
-                )
+                schedule_update(status="converting", progress=85, speed=None)
 
     batch_path = os.path.join(DOWNLOAD_DIR, batch_dir)
     os.makedirs(batch_path, exist_ok=True)
@@ -150,6 +175,8 @@ def _run_download(
         ],
         "quiet": True,
         "no_warnings": True,
+        "noprogress": True,
+        "logger": logger,
         "progress_hooks": [progress_hook],
     }
     if ffmpeg:
@@ -164,12 +191,6 @@ def _run_download(
     if download_id in _cancelled_ids:
         raise DownloadError("Cancelled by user")
 
-    # FFmpeg done → 90%, writing tags next
-    asyncio.run_coroutine_threadsafe(
-        _update_db(download_id, status="tagging", progress=90, speed=None),
-        loop,
-    )
-
     # Determine final mp3 path
     if found_path:
         base = os.path.splitext(found_path[0])[0]
@@ -180,7 +201,19 @@ def _run_download(
     if not os.path.exists(mp3):
         raise DownloadError(f"File not found after download: {mp3}")
 
+    if meta.cut_start or meta.cut_end:
+        schedule_update(status="cutting", progress=87, speed=None)
+        _cut_audio(mp3, meta.cut_start, meta.cut_end)
+
+    # Cut (if any) done → writing tags next
+    schedule_update(status="tagging", progress=92, speed=None)
     _write_id3(mp3, meta)
+
+    # Make sure the last write above has actually landed before the caller
+    # (the queue worker) writes the final "done"/100 status right after this returns.
+    if pending_write[0] is not None:
+        pending_write[0].result()
+
     return mp3
 
 

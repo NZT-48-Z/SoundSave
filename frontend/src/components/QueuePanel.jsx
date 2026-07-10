@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { startBulkDownload } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
+import CutModal from './CutModal'
 import EmptyState from './EmptyState'
-import { isModifiedTitle } from '../utils/trackModifiers'
+import { isModifiedTitle, isShortTrack } from '../utils/trackModifiers'
 import { fmtDuration, fmtTotalDuration } from '../utils/format'
 
 const COLS = '20px 32px 44px 1fr 1fr 150px 110px 50px 28px 28px'
@@ -42,11 +43,22 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const [coverPickerId, setCoverPickerId] = useState(null)
+  const [cutPickerId, setCutPickerId] = useState(null)
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
 
   const allSelected = queue.length > 0 && selected.size === queue.length
   const hasSelected = selected.size > 0
+
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key !== 'Escape' || !hasSelected || bulkCoverOpen || coverPickerId || cutPickerId) return
+      setSelected(new Set())
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [bulkCoverOpen, coverPickerId, cutPickerId, hasSelected])
 
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(queue.map(i => i.id)))
   const toggle = (id) => {
@@ -79,6 +91,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
         artwork_local_path: i.artwork_local_path || null,
+        cut_start: i.cut_start ?? null, cut_end: i.cut_end ?? null,
       }))
       const result = await startBulkDownload(items)
       onDownloaded(queue.map(i => i.id), result.ids || [])
@@ -100,6 +113,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
         artwork_local_path: i.artwork_local_path || null,
+        cut_start: i.cut_start ?? null, cut_end: i.cut_end ?? null,
       }))
       const result = await startBulkDownload(payload)
       onDownloaded(items.map(i => i.id), result.ids || [])
@@ -111,7 +125,12 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
     }
   }
 
-  const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
+  const queueTotalSecs = queue.reduce((s, item) => {
+    const d = item.cut_end != null || item.cut_start != null
+      ? (item.cut_end ?? item.duration) - (item.cut_start ?? 0)
+      : item.duration
+    return s + (Number(d) || 0)
+  }, 0)
   const queueTotalDuration = queueTotalSecs > 0 ? fmtTotalDuration(queueTotalSecs) : null
   const queueTotalDurationLabel = queueTotalDuration
     ? `${queueTotalDuration}${queueTotalSecs >= 3600 ? '' : ' min'}`
@@ -273,6 +292,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {queue.map((item, index) => {
           const modified = isModifiedTitle(item.title)
+          const shortTrack = isShortTrack(item.duration)
           const expanded = expandedId === item.id
           return (
             <div key={item.id}>
@@ -281,6 +301,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 index={index}
                 isSelected={selected.has(item.id)}
                 isModified={modified}
+                isShortTrack={shortTrack}
                 isExpanded={expanded}
                 isDragging={dragIndex === index}
                 isDragOver={dragOverIndex === index && dragIndex !== index}
@@ -293,6 +314,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
                 onPickCover={() => setCoverPickerId(item.id)}
+                onPickCut={() => setCutPickerId(item.id)}
                 onPreview={() => onPreview(item)}
                 isPreviewActive={previewTrackId === item.id}
                 isPreviewPlaying={isPreviewPlaying}
@@ -308,7 +330,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 }}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
               />
-              {expanded && modified && (
+              {expanded && (modified || shortTrack) && (
                 <AlternativesPanel
                   item={item}
                   onReplace={track => {
@@ -317,6 +339,9 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                       title: track.title,
                       artist: track.artist,
                       artwork_url: track.artwork_url || null,
+                      duration: track.duration || 0,
+                      cut_start: null,
+                      cut_end: null,
                     })
                     setExpandedId(null)
                     showToast?.(`Replaced with "${track.title}"`)
@@ -346,6 +371,20 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         ) : null
       })()}
 
+      {cutPickerId && (() => {
+        const picked = queue.find(i => i.id === cutPickerId)
+        return picked ? (
+          <CutModal
+            item={picked}
+            onClose={() => setCutPickerId(null)}
+            onConfirm={({ cut_start, cut_end }) => {
+              onUpdate(cutPickerId, { cut_start, cut_end })
+              setCutPickerId(null)
+            }}
+          />
+        ) : null
+      })()}
+
       {bulkCoverOpen && (
         <CoverPickerModal
           item={queue.find(i => selected.has(i.id)) || {}}
@@ -360,12 +399,17 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   )
 }
 
-function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function QueueRow({ item, index, isSelected, isModified, isShortTrack, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPickCut, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
   const [thumbHov, setThumbHov] = useState(false)
   const [playHov, setPlayHov] = useState(false)
+  const [cutHov, setCutHov] = useState(false)
+  const isCut = (item.cut_start ?? 0) > 0 || (item.cut_end != null && item.duration && item.cut_end < item.duration)
+  const effectiveDuration = isCut
+    ? (item.cut_end ?? item.duration) - (item.cut_start ?? 0)
+    : item.duration
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver() }}
@@ -449,27 +493,54 @@ function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging,
       {/* Title cell — with optional warning badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
         <InlineInput value={item.title} onChange={v => onUpdate('title', v)} placeholder="Title" />
-        {isModified && (
-          <button
-            onClick={onToggleAlternatives}
-            onMouseEnter={() => setWarnHov(true)}
-            onMouseLeave={() => setWarnHov(false)}
-            title="Modified version detected — click to find originals"
-            style={{
-              flexShrink: 0, width: 22, height: 22,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: isExpanded ? 'rgba(234,179,8,0.15)' : warnHov ? 'rgba(234,179,8,0.1)' : 'transparent',
-              border: `1px solid ${isExpanded || warnHov ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.2)'}`,
-              borderRadius: 5, cursor: 'pointer', transition: 'all 0.12s',
-              color: semantic.warning,
-            }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-          </button>
+        {(isModified || isShortTrack) && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={onToggleAlternatives}
+              onMouseEnter={() => setWarnHov(true)}
+              onMouseLeave={() => setWarnHov(false)}
+              style={{
+                width: 22, height: 22,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: isExpanded ? 'rgba(234,179,8,0.15)' : warnHov ? 'rgba(234,179,8,0.1)' : 'transparent',
+                border: `1px solid ${isExpanded || warnHov ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.2)'}`,
+                borderRadius: 5, cursor: 'pointer', transition: 'all 0.12s',
+                color: semantic.warning,
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </button>
+            {warnHov && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 20,
+                minWidth: 200, maxWidth: 260,
+                background: bg.overlay, border: `1px solid ${border.subtle}`,
+                borderRadius: 7, padding: '8px 10px',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+                pointerEvents: 'none',
+              }}>
+                {isModified && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: neutral[200], marginBottom: isShortTrack ? 5 : 0, lineHeight: 1.4 }}>
+                    <span style={{ color: semantic.warning, flexShrink: 0 }}>●</span>
+                    Modified version detected (slowed / nightcore / etc.)
+                  </div>
+                )}
+                {isShortTrack && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: neutral[200], lineHeight: 1.4 }}>
+                    <span style={{ color: semantic.warning, flexShrink: 0 }}>●</span>
+                    Short track — likely a preview (≤30s)
+                  </div>
+                )}
+                <div style={{ fontSize: 10.5, color: neutral[600], marginTop: 6, paddingTop: 5, borderTop: `1px solid ${border.subtle}` }}>
+                  Click to search alternatives
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
@@ -477,9 +548,29 @@ function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging,
       <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color={neutral[500]} />
       <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color={neutral[500]} />
 
-      {/* Duration */}
-      <div style={{ fontSize: 11, color: neutral[600], fontFamily: "'JetBrains Mono', monospace", textAlign: 'right', paddingRight: 4 }}>
-        {item.duration > 0 ? fmtDuration(item.duration) : ''}
+      {/* Duration + cut */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 4 }}>
+        <button
+          onClick={onPickCut}
+          onMouseEnter={() => setCutHov(true)}
+          onMouseLeave={() => setCutHov(false)}
+          title={isCut ? 'Cut — click to edit' : 'Cut track'}
+          style={{
+            width: 18, height: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isCut ? 'rgba(249,115,22,0.12)' : cutHov ? 'rgba(255,255,255,0.06)' : 'transparent',
+            border: 'none', borderRadius: 4, padding: 0,
+            color: isCut ? accent[500] : cutHov ? text.secondary : neutral[700],
+            cursor: 'pointer', transition: 'all 0.1s',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>
+          </svg>
+        </button>
+        <span style={{ fontSize: 11, color: isCut ? accent[500] : neutral[600], fontFamily: "'JetBrains Mono', monospace" }}>
+          {effectiveDuration > 0 ? fmtDuration(effectiveDuration) : ''}
+        </span>
       </div>
 
       {/* Preview button */}

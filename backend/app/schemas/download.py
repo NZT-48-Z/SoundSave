@@ -11,6 +11,8 @@ class DownloadRequest(BaseModel):
     genre: str | None = None
     artwork_url: str | None = None
     artwork_local_path: str | None = None
+    cut_start: float | None = None
+    cut_end: float | None = None
 
 
 class BulkDownloadRequest(BaseModel):

@@ -4,12 +4,13 @@ import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtSpeed } from '../utils/format'
 import EmptyState from './EmptyState'
 
-const ACTIVE_STATUSES = new Set(['pending', 'downloading', 'converting', 'tagging'])
+const ACTIVE_STATUSES = new Set(['pending', 'downloading', 'converting', 'cutting', 'tagging'])
 
 const STATUS_MAP = {
   pending:     { label: 'Pending',     color: neutral[400],    bg: 'rgba(161,161,170,0.08)' },
   downloading: { label: 'Downloading', color: semantic.info,   bg: semantic.infoBg          },
   converting:  { label: 'Converting',  color: accent[500],     bg: 'rgba(249,115,22,0.1)'   },
+  cutting:     { label: 'Cutting',     color: accent[500],     bg: 'rgba(249,115,22,0.1)'   },
   tagging:     { label: 'Tagging',     color: semantic.warning, bg: semantic.warningBg      },
   done:        { label: 'Done',        color: semantic.success, bg: 'rgba(34,197,94,0.08)'  },
   cancelled:   { label: 'Cancelled',   color: neutral[500],    bg: 'rgba(113,113,122,0.08)' },
@@ -145,7 +146,7 @@ function SectionHeader({ label, color }) {
 
 export default function DownloadsPanel({ downloads, onClearHistory }) {
   const done = downloads.filter(d => d.status === 'done').length
-  const active = downloads.filter(d => ['downloading', 'converting', 'tagging'].includes(d.status)).length
+  const active = downloads.filter(d => ['downloading', 'converting', 'cutting', 'tagging'].includes(d.status)).length
   const errors = downloads.filter(d => d.status === 'error').length
   const cancelled = downloads.filter(d => d.status === 'cancelled').length
   const total = downloads.length

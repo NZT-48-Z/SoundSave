@@ -70,8 +70,8 @@ export default function App() {
   const [currentPreview, setCurrentPreview] = useState(null) // { trackId, title, artist, artwork_url, duration }
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const pollRef = useRef(null)
   const audioRef = useRef(new Audio())
+  const previewReqRef = useRef(0)
 
   useEffect(() => {
     getYandexAuthStatus().then(s => setYandexConnected(!!s.connected))
@@ -95,11 +95,21 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    pollRef.current = setInterval(async () => {
+    let cancelled = false
+    let timeoutId
+
+    const poll = async () => {
       const data = await getDownloads()
+      if (cancelled) return
       setDownloads(data)
-    }, 800)
-    return () => clearInterval(pollRef.current)
+      timeoutId = setTimeout(poll, 800)
+    }
+    timeoutId = setTimeout(poll, 800)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   // Detect when all downloads in the active batch are finished
@@ -137,6 +147,8 @@ export default function App() {
         album: track.album || '',
         genre: track.genre || '',
         duration: track.duration || 0,
+        cut_start: null,
+        cut_end: null,
         color: trackColor(track.id),
       }]
     })
@@ -157,6 +169,8 @@ export default function App() {
           album: t.album || '',
           genre: t.genre || '',
           duration: t.duration || 0,
+          cut_start: null,
+          cut_end: null,
           color: trackColor(t.id),
         }))
       return fresh.length ? [...prev, ...fresh] : prev
@@ -170,6 +184,11 @@ export default function App() {
 
   const updateQueueItem = useCallback((id, updates) => {
     setQueue(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i))
+    setCurrentPreview(prev => (
+      prev?.trackId === id
+        ? { ...prev, ...updates }
+        : prev
+    ))
   }, [])
 
   const reorderQueue = useCallback((from, to) => {
@@ -199,16 +218,19 @@ export default function App() {
       audio.paused ? audio.play() : audio.pause()
       return
     }
+    const reqId = ++previewReqRef.current
     audio.pause()
     setCurrentPreview({ trackId: track.id, title: track.title, artist: track.artist, artwork_url: track.artwork_url || null, duration: track.duration || 0 })
     setPreviewLoading(true)
     setIsPreviewPlaying(false)
     try {
       const { stream_url } = await getPreviewUrl(track.url)
+      if (previewReqRef.current !== reqId) return // superseded by a newer preview request
       audio.src = stream_url
       audio.load()
       await audio.play()
     } catch (err) {
+      if (previewReqRef.current !== reqId) return
       if (err?.name !== 'AbortError') {
         console.error('Preview failed:', err)
         const msg = err?.message || ''
@@ -221,7 +243,7 @@ export default function App() {
         audio.src = ''
       }
     } finally {
-      setPreviewLoading(false)
+      if (previewReqRef.current === reqId) setPreviewLoading(false)
     }
   }, [currentPreview, showToast])
 
@@ -265,7 +287,7 @@ export default function App() {
     if (downloadIds.length > 0) setActiveBatch(new Set(downloadIds))
   }, [showToast])
 
-  const activeDl = downloads.filter(d => ['downloading', 'converting', 'tagging'].includes(d.status)).length
+  const activeDl = downloads.filter(d => ['downloading', 'converting', 'cutting', 'tagging'].includes(d.status)).length
   const queueCount = queue.length
 
   const tabBtn = (id, label, icon, badge) => {

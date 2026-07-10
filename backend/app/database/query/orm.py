@@ -48,7 +48,9 @@ class AsyncORM:
         result = await db.execute(
             update(Download)
             .where(
-                Download.status.in_(["downloading", "converting", "tagging", "pending"])
+                Download.status.in_(
+                    ["downloading", "converting", "cutting", "tagging", "pending"]
+                )
             )
             .values(status="error", error="Interrupted — server was restarted")
         )

@@ -16,6 +16,7 @@ dependencies = [
     "yandex-music>=3.0.0",
     "keyring>=25.0.0",
     "python-multipart>=0.0.32",
+    "colorama>=0.4.6",
 ]
 
 [tool.pytest.ini_options]

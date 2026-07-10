@@ -6,6 +6,11 @@ export function isModifiedTitle(title) {
   return MOD_RE.test(title || '')
 }
 
+export function isShortTrack(duration) {
+  const seconds = Number(duration) || 0
+  return seconds > 0 && Math.floor(seconds) <= 30
+}
+
 export function cleanTitle(title) {
   return (title || '').replace(CLEAN_RE, '').replace(/[\s\-–|(\[]+$/, '').trim()
 }

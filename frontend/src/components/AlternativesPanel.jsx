@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { getAlternatives } from '../api'
 import { accent, bg, border, neutral, semantic } from '../theme'
-import { cleanTitle, isModifiedTitle } from '../utils/trackModifiers'
+import { cleanTitle, isModifiedTitle, isShortTrack } from '../utils/trackModifiers'
 import { fmtDuration } from '../utils/format'
 
 export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) {
@@ -9,19 +9,26 @@ export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) 
   const [results, setResults] = useState([])
   const [hovered, setHovered] = useState(null)
   const clean = cleanTitle(item.title)
+  const modifiedReason = isModifiedTitle(item.title)
+  const shortReason = isShortTrack(item.duration)
+  const headerLabel = modifiedReason && shortReason
+    ? 'Modified & short track detected'
+    : modifiedReason
+    ? 'Modified version detected'
+    : 'Short track detected — likely a preview'
 
   useEffect(() => {
     let cancelled = false
     getAlternatives(item.title, item.artist)
       .then(data => {
         if (!cancelled) {
-          setResults(data.results || [])
+          setResults((data.results || []).filter(r => r.url !== item.url && !isShortTrack(r.duration)))
           setState('done')
         }
       })
       .catch(() => { if (!cancelled) setState('error') })
     return () => { cancelled = true }
-  }, [item.title, item.artist])
+  }, [item.title, item.artist, item.url])
 
   return (
     <div style={{
@@ -42,9 +49,9 @@ export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) 
             <line x1="12" y1="17" x2="12.01" y2="17"/>
           </svg>
           <span style={{ fontSize: 12, color: neutral[400] }}>
-            Modified version detected —{' '}
+            {headerLabel} —{' '}
             <span style={{ color: neutral[50], fontWeight: 500 }}>"{clean}"</span>
-            {' '}originals on SoundCloud:
+            {' '}alternatives on SoundCloud:
           </span>
         </div>
         <button
@@ -66,7 +73,7 @@ export default function AlternativesPanel({ item, onReplace, onKeep, onClose }) 
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" style={{ animation: 'spin 0.8s linear infinite', flexShrink: 0 }}>
               <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
             </svg>
-            Searching SoundCloud for originals…
+            Searching SoundCloud for alternatives…
           </div>
         )}
 
