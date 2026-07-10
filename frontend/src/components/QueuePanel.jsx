@@ -3,6 +3,7 @@ import { startBulkDownload } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
+import CutModal from './CutModal'
 import EmptyState from './EmptyState'
 import { isModifiedTitle, isShortTrack } from '../utils/trackModifiers'
 import { fmtDuration, fmtTotalDuration } from '../utils/format'
@@ -42,6 +43,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   const [loading, setLoading] = useState(false)
   const [expandedId, setExpandedId] = useState(null)
   const [coverPickerId, setCoverPickerId] = useState(null)
+  const [cutPickerId, setCutPickerId] = useState(null)
   const [dragIndex, setDragIndex] = useState(null)
   const [dragOverIndex, setDragOverIndex] = useState(null)
 
@@ -50,13 +52,13 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
 
   useEffect(() => {
     const handleEscape = (e) => {
-      if (e.key !== 'Escape' || !hasSelected || bulkCoverOpen || coverPickerId) return
+      if (e.key !== 'Escape' || !hasSelected || bulkCoverOpen || coverPickerId || cutPickerId) return
       setSelected(new Set())
     }
 
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [bulkCoverOpen, coverPickerId, hasSelected])
+  }, [bulkCoverOpen, coverPickerId, cutPickerId, hasSelected])
 
   const toggleAll = () => setSelected(allSelected ? new Set() : new Set(queue.map(i => i.id)))
   const toggle = (id) => {
@@ -89,6 +91,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
         artwork_local_path: i.artwork_local_path || null,
+        cut_start: i.cut_start ?? null, cut_end: i.cut_end ?? null,
       }))
       const result = await startBulkDownload(items)
       onDownloaded(queue.map(i => i.id), result.ids || [])
@@ -110,6 +113,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         album: i.album || null, genre: i.genre || null,
         artwork_url: i.artwork_url || null,
         artwork_local_path: i.artwork_local_path || null,
+        cut_start: i.cut_start ?? null, cut_end: i.cut_end ?? null,
       }))
       const result = await startBulkDownload(payload)
       onDownloaded(items.map(i => i.id), result.ids || [])
@@ -121,7 +125,12 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
     }
   }
 
-  const queueTotalSecs = queue.reduce((s, item) => s + (Number(item.duration) || 0), 0)
+  const queueTotalSecs = queue.reduce((s, item) => {
+    const d = item.cut_end != null || item.cut_start != null
+      ? (item.cut_end ?? item.duration) - (item.cut_start ?? 0)
+      : item.duration
+    return s + (Number(d) || 0)
+  }, 0)
   const queueTotalDuration = queueTotalSecs > 0 ? fmtTotalDuration(queueTotalSecs) : null
   const queueTotalDurationLabel = queueTotalDuration
     ? `${queueTotalDuration}${queueTotalSecs >= 3600 ? '' : ' min'}`
@@ -305,6 +314,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 }}
                 onToggleAlternatives={() => setExpandedId(expanded ? null : item.id)}
                 onPickCover={() => setCoverPickerId(item.id)}
+                onPickCut={() => setCutPickerId(item.id)}
                 onPreview={() => onPreview(item)}
                 isPreviewActive={previewTrackId === item.id}
                 isPreviewPlaying={isPreviewPlaying}
@@ -330,6 +340,8 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                       artist: track.artist,
                       artwork_url: track.artwork_url || null,
                       duration: track.duration || 0,
+                      cut_start: null,
+                      cut_end: null,
                     })
                     setExpandedId(null)
                     showToast?.(`Replaced with "${track.title}"`)
@@ -359,6 +371,20 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
         ) : null
       })()}
 
+      {cutPickerId && (() => {
+        const picked = queue.find(i => i.id === cutPickerId)
+        return picked ? (
+          <CutModal
+            item={picked}
+            onClose={() => setCutPickerId(null)}
+            onConfirm={({ cut_start, cut_end }) => {
+              onUpdate(cutPickerId, { cut_start, cut_end })
+              setCutPickerId(null)
+            }}
+          />
+        ) : null
+      })()}
+
       {bulkCoverOpen && (
         <CoverPickerModal
           item={queue.find(i => selected.has(i.id)) || {}}
@@ -373,12 +399,17 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   )
 }
 
-function QueueRow({ item, index, isSelected, isModified, isShortTrack, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function QueueRow({ item, index, isSelected, isModified, isShortTrack, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPickCut, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
   const [thumbHov, setThumbHov] = useState(false)
   const [playHov, setPlayHov] = useState(false)
+  const [cutHov, setCutHov] = useState(false)
+  const isCut = (item.cut_start ?? 0) > 0 || (item.cut_end != null && item.duration && item.cut_end < item.duration)
+  const effectiveDuration = isCut
+    ? (item.cut_end ?? item.duration) - (item.cut_start ?? 0)
+    : item.duration
   return (
     <div
       onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onDragOver() }}
@@ -517,9 +548,29 @@ function QueueRow({ item, index, isSelected, isModified, isShortTrack, isExpande
       <InlineInput value={item.album} onChange={v => onUpdate('album', v)} placeholder="Album" color={neutral[500]} />
       <InlineInput value={item.genre} onChange={v => onUpdate('genre', v)} placeholder="Genre" color={neutral[500]} />
 
-      {/* Duration */}
-      <div style={{ fontSize: 11, color: neutral[600], fontFamily: "'JetBrains Mono', monospace", textAlign: 'right', paddingRight: 4 }}>
-        {item.duration > 0 ? fmtDuration(item.duration) : ''}
+      {/* Duration + cut */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, paddingRight: 4 }}>
+        <button
+          onClick={onPickCut}
+          onMouseEnter={() => setCutHov(true)}
+          onMouseLeave={() => setCutHov(false)}
+          title={isCut ? 'Cut — click to edit' : 'Cut track'}
+          style={{
+            width: 18, height: 18, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: isCut ? 'rgba(249,115,22,0.12)' : cutHov ? 'rgba(255,255,255,0.06)' : 'transparent',
+            border: 'none', borderRadius: 4, padding: 0,
+            color: isCut ? accent[500] : cutHov ? text.secondary : neutral[700],
+            cursor: 'pointer', transition: 'all 0.1s',
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+            <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>
+          </svg>
+        </button>
+        <span style={{ fontSize: 11, color: isCut ? accent[500] : neutral[600], fontFamily: "'JetBrains Mono', monospace" }}>
+          {effectiveDuration > 0 ? fmtDuration(effectiveDuration) : ''}
+        </span>
       </div>
 
       {/* Preview button */}
