@@ -71,6 +71,7 @@ export default function App() {
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
   const audioRef = useRef(new Audio())
+  const previewReqRef = useRef(0)
 
   useEffect(() => {
     getYandexAuthStatus().then(s => setYandexConnected(!!s.connected))
@@ -217,16 +218,19 @@ export default function App() {
       audio.paused ? audio.play() : audio.pause()
       return
     }
+    const reqId = ++previewReqRef.current
     audio.pause()
     setCurrentPreview({ trackId: track.id, title: track.title, artist: track.artist, artwork_url: track.artwork_url || null, duration: track.duration || 0 })
     setPreviewLoading(true)
     setIsPreviewPlaying(false)
     try {
       const { stream_url } = await getPreviewUrl(track.url)
+      if (previewReqRef.current !== reqId) return // superseded by a newer preview request
       audio.src = stream_url
       audio.load()
       await audio.play()
     } catch (err) {
+      if (previewReqRef.current !== reqId) return
       if (err?.name !== 'AbortError') {
         console.error('Preview failed:', err)
         const msg = err?.message || ''
@@ -239,7 +243,7 @@ export default function App() {
         audio.src = ''
       }
     } finally {
-      setPreviewLoading(false)
+      if (previewReqRef.current === reqId) setPreviewLoading(false)
     }
   }, [currentPreview, showToast])
 
