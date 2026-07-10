@@ -146,6 +146,8 @@ export default function App() {
         album: track.album || '',
         genre: track.genre || '',
         duration: track.duration || 0,
+        cut_start: null,
+        cut_end: null,
         color: trackColor(track.id),
       }]
     })
@@ -166,6 +168,8 @@ export default function App() {
           album: t.album || '',
           genre: t.genre || '',
           duration: t.duration || 0,
+          cut_start: null,
+          cut_end: null,
           color: trackColor(t.id),
         }))
       return fresh.length ? [...prev, ...fresh] : prev
@@ -279,7 +283,7 @@ export default function App() {
     if (downloadIds.length > 0) setActiveBatch(new Set(downloadIds))
   }, [showToast])
 
-  const activeDl = downloads.filter(d => ['downloading', 'converting', 'tagging'].includes(d.status)).length
+  const activeDl = downloads.filter(d => ['downloading', 'converting', 'cutting', 'tagging'].includes(d.status)).length
   const queueCount = queue.length
 
   const tabBtn = (id, label, icon, badge) => {
