@@ -51,3 +51,13 @@ def get_ffmpeg_location() -> str | None:
         "ffmpeg not found — install with: .venv\\Scripts\\pip install static-ffmpeg"
     )
     return None
+
+
+def get_ffmpeg_exe() -> str:
+    import os
+
+    d = get_ffmpeg_location()
+    if not d:
+        return "ffmpeg"
+    exe = "ffmpeg.exe" if os.name == "nt" else "ffmpeg"
+    return os.path.join(d, exe)
