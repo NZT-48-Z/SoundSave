@@ -70,7 +70,6 @@ export default function App() {
   const [currentPreview, setCurrentPreview] = useState(null) // { trackId, title, artist, artwork_url, duration }
   const [isPreviewPlaying, setIsPreviewPlaying] = useState(false)
   const [previewLoading, setPreviewLoading] = useState(false)
-  const pollRef = useRef(null)
   const audioRef = useRef(new Audio())
 
   useEffect(() => {
@@ -95,11 +94,21 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    pollRef.current = setInterval(async () => {
+    let cancelled = false
+    let timeoutId
+
+    const poll = async () => {
       const data = await getDownloads()
+      if (cancelled) return
       setDownloads(data)
-    }, 800)
-    return () => clearInterval(pollRef.current)
+      timeoutId = setTimeout(poll, 800)
+    }
+    timeoutId = setTimeout(poll, 800)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timeoutId)
+    }
   }, [])
 
   // Detect when all downloads in the active batch are finished
