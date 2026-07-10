@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.config import settings
-from app.core.logger import configure_logging
 from app.database.database import async_session_factory, create_tables
 from app.database.query.orm import AsyncORM
 from app.services.downloader import download_queue
@@ -15,8 +14,6 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    configure_logging()
-
     download_dir = os.path.expanduser(settings.DOWNLOAD_DIR)
     os.makedirs(download_dir, exist_ok=True)
     logger.info("Download directory: %s", download_dir)
