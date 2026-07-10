@@ -4,7 +4,7 @@ import { accent, bg, border, neutral, semantic, text } from '../theme'
 import AlternativesPanel from './AlternativesPanel'
 import CoverPickerModal from './CoverPickerModal'
 import EmptyState from './EmptyState'
-import { isModifiedTitle } from '../utils/trackModifiers'
+import { isModifiedTitle, isShortTrack } from '../utils/trackModifiers'
 import { fmtDuration, fmtTotalDuration } from '../utils/format'
 
 const COLS = '20px 32px 44px 1fr 1fr 150px 110px 50px 28px 28px'
@@ -283,6 +283,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
         {queue.map((item, index) => {
           const modified = isModifiedTitle(item.title)
+          const shortTrack = isShortTrack(item.duration)
           const expanded = expandedId === item.id
           return (
             <div key={item.id}>
@@ -291,6 +292,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 index={index}
                 isSelected={selected.has(item.id)}
                 isModified={modified}
+                isShortTrack={shortTrack}
                 isExpanded={expanded}
                 isDragging={dragIndex === index}
                 isDragOver={dragOverIndex === index && dragIndex !== index}
@@ -318,7 +320,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                 }}
                 onDragEnd={() => { setDragIndex(null); setDragOverIndex(null) }}
               />
-              {expanded && modified && (
+              {expanded && (modified || shortTrack) && (
                 <AlternativesPanel
                   item={item}
                   onReplace={track => {
@@ -327,6 +329,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
                       title: track.title,
                       artist: track.artist,
                       artwork_url: track.artwork_url || null,
+                      duration: track.duration || 0,
                     })
                     setExpandedId(null)
                     showToast?.(`Replaced with "${track.title}"`)
@@ -370,7 +373,7 @@ export default function QueuePanel({ queue, onRemove, onUpdate, onClear, onReord
   )
 }
 
-function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
+function QueueRow({ item, index, isSelected, isModified, isShortTrack, isExpanded, isDragging, isDragOver, onToggle, onUpdate, onRemove, onToggleAlternatives, onPickCover, onPreview, isPreviewActive, isPreviewPlaying, previewLoading, onDragStart, onDragOver, onDrop, onDragEnd }) {
   const [delHov, setDelHov] = useState(false)
   const [warnHov, setWarnHov] = useState(false)
   const [rowHov, setRowHov] = useState(false)
@@ -459,27 +462,54 @@ function QueueRow({ item, index, isSelected, isModified, isExpanded, isDragging,
       {/* Title cell — with optional warning badge */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
         <InlineInput value={item.title} onChange={v => onUpdate('title', v)} placeholder="Title" />
-        {isModified && (
-          <button
-            onClick={onToggleAlternatives}
-            onMouseEnter={() => setWarnHov(true)}
-            onMouseLeave={() => setWarnHov(false)}
-            title="Modified version detected — click to find originals"
-            style={{
-              flexShrink: 0, width: 22, height: 22,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: isExpanded ? 'rgba(234,179,8,0.15)' : warnHov ? 'rgba(234,179,8,0.1)' : 'transparent',
-              border: `1px solid ${isExpanded || warnHov ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.2)'}`,
-              borderRadius: 5, cursor: 'pointer', transition: 'all 0.12s',
-              color: semantic.warning,
-            }}
-          >
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
-              <line x1="12" y1="9" x2="12" y2="13"/>
-              <line x1="12" y1="17" x2="12.01" y2="17"/>
-            </svg>
-          </button>
+        {(isModified || isShortTrack) && (
+          <div style={{ position: 'relative', flexShrink: 0 }}>
+            <button
+              onClick={onToggleAlternatives}
+              onMouseEnter={() => setWarnHov(true)}
+              onMouseLeave={() => setWarnHov(false)}
+              style={{
+                width: 22, height: 22,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                background: isExpanded ? 'rgba(234,179,8,0.15)' : warnHov ? 'rgba(234,179,8,0.1)' : 'transparent',
+                border: `1px solid ${isExpanded || warnHov ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.2)'}`,
+                borderRadius: 5, cursor: 'pointer', transition: 'all 0.12s',
+                color: semantic.warning,
+              }}
+            >
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                <line x1="12" y1="9" x2="12" y2="13"/>
+                <line x1="12" y1="17" x2="12.01" y2="17"/>
+              </svg>
+            </button>
+            {warnHov && (
+              <div style={{
+                position: 'absolute', top: '100%', left: 0, marginTop: 5, zIndex: 20,
+                minWidth: 200, maxWidth: 260,
+                background: bg.overlay, border: `1px solid ${border.subtle}`,
+                borderRadius: 7, padding: '8px 10px',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.4)',
+                pointerEvents: 'none',
+              }}>
+                {isModified && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: neutral[200], marginBottom: isShortTrack ? 5 : 0, lineHeight: 1.4 }}>
+                    <span style={{ color: semantic.warning, flexShrink: 0 }}>●</span>
+                    Modified version detected (slowed / nightcore / etc.)
+                  </div>
+                )}
+                {isShortTrack && (
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start', fontSize: 11.5, color: neutral[200], lineHeight: 1.4 }}>
+                    <span style={{ color: semantic.warning, flexShrink: 0 }}>●</span>
+                    Short track — likely a preview (≤30s)
+                  </div>
+                )}
+                <div style={{ fontSize: 10.5, color: neutral[600], marginTop: 6, paddingTop: 5, borderTop: `1px solid ${border.subtle}` }}>
+                  Click to search alternatives
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
 
