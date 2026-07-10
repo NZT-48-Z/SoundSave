@@ -3,6 +3,7 @@ import { importFromYandex, resolveUrl, searchTracks } from '../api'
 import { accent, bg, border, neutral, semantic, text } from '../theme'
 import { fmtDuration } from '../utils/format'
 import EmptyState from './EmptyState'
+import YandexImportReportModal from './YandexImportReportModal'
 
 function PreviewBtn({ isActive, isPlaying, isLoading, onClick }) {
   return (
@@ -181,6 +182,7 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
   const [loading, setLoading] = useState(false)
   const [loadingMsg, setLoadingMsg] = useState('')
   const [importStats, setImportStats] = useState(null)
+  const [yandexReport, setYandexReport] = useState(null)
   const [error, setError] = useState('')
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
@@ -207,6 +209,7 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
           tracks = res.results || []
           setImportStats({ total: res.total, found: res.found, not_found: res.not_found })
           setHasMore(false)
+          setYandexReport(res)
         } catch (e) {
           if (e.code === 'YANDEX_NOT_CONNECTED') {
             pendingYandexUrl.current = q
@@ -410,6 +413,13 @@ export default function SearchPanel({ queue, onAddToQueue, onRemoveFromQueue, sh
           >
             <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
           </EmptyState>
+        )}
+
+        {yandexReport && (
+          <YandexImportReportModal
+            report={yandexReport}
+            onClose={() => setYandexReport(null)}
+          />
         )}
     </div>
   )
