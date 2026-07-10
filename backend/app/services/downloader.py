@@ -150,6 +150,8 @@ def _run_download(
         ],
         "quiet": True,
         "no_warnings": True,
+        "noprogress": True,
+        "logger": logger,
         "progress_hooks": [progress_hook],
     }
     if ffmpeg:
