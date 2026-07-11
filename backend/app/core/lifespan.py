@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.core.config import settings
+from app.core.executor import init_executor, shutdown_executor
 from app.database.database import async_session_factory, create_tables
 from app.database.query.orm import AsyncORM
 from app.services.downloader import download_queue
@@ -14,12 +15,15 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    download_dir = os.path.expanduser(settings.DOWNLOAD_DIR)
-    os.makedirs(download_dir, exist_ok=True)
-    logger.info("Download directory: %s", download_dir)
+    """Инициализация при старте и корректное завершение приложения."""
+    os.makedirs(settings.download_path, exist_ok=True)
+    os.makedirs(settings.covers_path, exist_ok=True)
+    logger.info("Download directory: %s", settings.download_path)
+
+    init_executor()
 
     await create_tables()
-    logger.info("Database ready: %s", settings.DB_PATH)
+    logger.info("Database ready: %s", settings.db_path_abs)
 
     async with async_session_factory() as session:
         count = await AsyncORM.reset_stale_downloads(session)
@@ -35,4 +39,5 @@ async def lifespan(app: FastAPI):
     yield
 
     await download_queue.stop()
+    shutdown_executor()
     logger.info("SoundSave API shutting down")
