@@ -1,9 +1,12 @@
-import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.concurrency import bounded_gather
+from app.core.exceptions import YandexError, YandexNotConnectedError
+from app.core.executor import run_blocking
+from app.core.validation import is_allowed_url
+from app.schemas.search import TrackInfo, YandexImportResponse, YandexNotFoundTrack
 from app.services.soundcloud import search_tracks
 from app.services.yandex import fetch_yandex_playlist
 from app.services.yandex_auth import (
@@ -15,22 +18,22 @@ from app.services.yandex_auth import (
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
-_executor = ThreadPoolExecutor(max_workers=6)
+
+_SC_CONCURRENCY = 5
 
 
 @router.get("/import/yandex/auth/status")
 async def yandex_auth_status():
-    """Check if a Yandex Music token is already stored."""
-    token = get_stored_token()
+    """Проверяет, сохранён ли уже токен Yandex Music."""
+    token = await run_blocking(get_stored_token)
     return {"connected": token is not None}
 
 
 @router.post("/import/yandex/auth/start")
 async def yandex_auth_start():
-    """Begin Device Auth flow. Returns user_code + verification_url."""
+    """Запускает device-flow авторизации. Возвращает user_code + verification_url."""
     try:
-        info = await start_device_auth()
-        return info
+        return await start_device_auth()
     except Exception as e:
         logger.error("Failed to start Yandex device auth: %s", e)
         raise HTTPException(status_code=502, detail=str(e))
@@ -38,7 +41,7 @@ async def yandex_auth_start():
 
 @router.get("/import/yandex/auth/poll/{session_id}")
 async def yandex_auth_poll(session_id: str):
-    """Poll whether the device auth has been confirmed."""
+    """Опрашивает, подтверждена ли device-авторизация."""
     session = get_session_status(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -47,59 +50,57 @@ async def yandex_auth_poll(session_id: str):
 
 @router.delete("/import/yandex/auth")
 async def yandex_auth_disconnect():
-    """Remove the stored Yandex token."""
-    delete_token()
+    """Удаляет сохранённый токен Yandex."""
+    await run_blocking(delete_token)
     return {"ok": True}
 
 
-@router.get("/import/yandex")
+@router.get("/import/yandex", response_model=YandexImportResponse)
 async def import_yandex(url: str = Query(...)):
-    loop = asyncio.get_running_loop()
+    """Импортирует плейлист Yandex Music и ищет каждый трек на SoundCloud."""
+    if not is_allowed_url(url):
+        raise HTTPException(status_code=400, detail="URL scheme not allowed")
 
-    # 1. Fetch Yandex Music playlist metadata
+    # 1. Получаем метаданные плейлиста Yandex Music.
     try:
-        ym_tracks = await loop.run_in_executor(_executor, fetch_yandex_playlist, url)
-    except ValueError as e:
-        if "YANDEX_NOT_CONNECTED" in str(e):
-            raise HTTPException(status_code=401, detail="YANDEX_NOT_CONNECTED")
-        raise HTTPException(status_code=400, detail=str(e))
+        ym_tracks = await run_blocking(fetch_yandex_playlist, url)
+    except YandexNotConnectedError:
+        raise HTTPException(status_code=401, detail="YANDEX_NOT_CONNECTED")
+    except YandexError as e:
+        raise HTTPException(status_code=400, detail=e.message)
     except Exception as e:
         logger.error("Yandex Music fetch failed: %s", e)
         raise HTTPException(status_code=502, detail=f"Yandex Music error: {e}")
 
     if not ym_tracks:
-        return {"results": [], "total": 0, "found": 0}
+        return YandexImportResponse(results=[], total=0, found=0)
 
-    # 2. Search SoundCloud for each track in parallel (max 5 concurrent)
-    sem = asyncio.Semaphore(5)
-
-    async def find_on_soundcloud(ym_track: dict) -> dict | None:
-        async with sem:
-            query = f"{ym_track['artist']} {ym_track['title']}"
-            try:
-                results = await loop.run_in_executor(_executor, search_tracks, query, 1)
-                if not results:
-                    logger.info("Not found on SoundCloud: %s", query)
-                    return None
-                sc = results[0]
-                # Pre-fill album from Yandex metadata
-                if ym_track.get("album"):
-                    sc["album"] = ym_track["album"]
-                sc["_ym_title"] = ym_track["title"]
-                sc["_ym_artist"] = ym_track["artist"]
-                return sc
-            except Exception as e:
-                logger.warning("SoundCloud search failed for '%s': %s", query, e)
+    # 2. Ищем каждый трек на SoundCloud (с ограниченной конкурентностью).
+    async def find_on_soundcloud(ym_track: dict) -> TrackInfo | None:
+        """Ищет один трек Яндекса на SoundCloud, подставляя альбом из метаданных."""
+        query = f"{ym_track['artist']} {ym_track['title']}"
+        try:
+            results = await run_blocking(search_tracks, query, 1)
+            if not results:
+                logger.info("Not found on SoundCloud: %s", query)
                 return None
+            sc = results[0]
+            if ym_track.get("album"):
+                sc["album"] = ym_track["album"]
+            return TrackInfo(**sc)
+        except Exception as e:
+            logger.warning("SoundCloud search failed for '%s': %s", query, e)
+            return None
 
-    tasks = [find_on_soundcloud(t) for t in ym_tracks]
-    sc_results = await asyncio.gather(*tasks)
+    sc_results = await bounded_gather(
+        ym_tracks, find_on_soundcloud, limit=_SC_CONCURRENCY
+    )
 
-    found = [r for r in sc_results if r is not None]
+    found = [t for t in sc_results if t is not None]
     not_found_tracks = [
-        {"title": ym["title"], "artist": ym["artist"]}
-        for ym, r in zip(ym_tracks, sc_results)
-        if r is None
+        YandexNotFoundTrack(title=ym["title"], artist=ym["artist"])
+        for ym, t in zip(ym_tracks, sc_results)
+        if t is None
     ]
 
     logger.info(
@@ -109,10 +110,10 @@ async def import_yandex(url: str = Query(...)):
         len(not_found_tracks),
     )
 
-    return {
-        "results": found,
-        "total": len(ym_tracks),
-        "found": len(found),
-        "not_found": len(not_found_tracks),
-        "not_found_tracks": not_found_tracks,
-    }
+    return YandexImportResponse(
+        results=found,
+        total=len(ym_tracks),
+        found=len(found),
+        not_found=len(not_found_tracks),
+        not_found_tracks=not_found_tracks,
+    )
