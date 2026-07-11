@@ -7,11 +7,12 @@ _ffmpeg_dir: str | None = None
 
 
 def get_ffmpeg_location() -> str | None:
+    """Находит папку с ffmpeg (PATH → static-ffmpeg → imageio-ffmpeg), кэширует."""
     global _ffmpeg_dir
     if _ffmpeg_dir:
         return _ffmpeg_dir
 
-    # 1. System PATH
+    # 1. Системный PATH
     path = shutil.which("ffmpeg")
     if path:
         import os
@@ -20,7 +21,7 @@ def get_ffmpeg_location() -> str | None:
         logger.info("Using system ffmpeg: %s", path)
         return _ffmpeg_dir
 
-    # 2. static-ffmpeg (auto-downloads binaries on first run)
+    # 2. static-ffmpeg (при первом запуске сам скачивает бинарники)
     try:
         import static_ffmpeg
 
@@ -35,7 +36,7 @@ def get_ffmpeg_location() -> str | None:
     except Exception as e:
         logger.warning("static-ffmpeg not available: %s", e)
 
-    # 3. imageio-ffmpeg fallback
+    # 3. Запасной вариант — imageio-ffmpeg
     try:
         import imageio_ffmpeg
         import os
@@ -54,6 +55,7 @@ def get_ffmpeg_location() -> str | None:
 
 
 def get_ffmpeg_exe() -> str:
+    """Возвращает полный путь к исполняемому файлу ffmpeg."""
     import os
 
     d = get_ffmpeg_location()
