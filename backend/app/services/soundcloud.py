@@ -7,7 +7,7 @@ from app.core.exceptions import SoundCloudError
 
 logger = logging.getLogger(__name__)
 
-# Patterns that indicate a modified/non-original track
+# Шаблоны, указывающие на модифицированный/неоригинальный трек
 _MOD_PATTERN = re.compile(
     r"\b(slowed|reverb|sped[\s_-]?up|speed[\s_-]?up|nightcore|8d[\s_-]?audio|"
     r"bass[\s_-]?boost(ed)?|lo[\s_-]?fi|pitched|slowed[\s_-]?down|"
@@ -15,7 +15,7 @@ _MOD_PATTERN = re.compile(
     re.I,
 )
 
-# Remove parenthesised / bracketed / dashed modifiers from the end of a title
+# Убирает из конца названия модификаторы в скобках/квадратных скобках/после тире
 _CLEAN_PATTERN = re.compile(
     r"[\s\-–]+[\(\[\|]?\s*"
     r"(slowed[\s&+]*reverb|slowed[\s&+]*reverbed|slowed|reverb(ed)?|sped[\s_-]?up|"
@@ -27,20 +27,22 @@ _CLEAN_PATTERN = re.compile(
 
 
 def is_modified_title(title: str) -> bool:
+    """True, если в названии есть маркер модификации (slowed/reverb/nightcore и т.п.)."""
     return bool(_MOD_PATTERN.search(title))
 
 
 def clean_title(title: str) -> str:
+    """Убирает из названия хвостовые модификаторы (slowed, reverb и пр.)."""
     cleaned = _CLEAN_PATTERN.sub("", title)
     return cleaned.strip(" -–|([")
 
 
 def search_alternatives(title: str, artist: str, limit: int = 6) -> list[dict]:
-    """Search for original versions of a track by stripping modifiers from the title."""
+    """Ищет оригинальные версии трека, убрав модификаторы из названия."""
     clean = clean_title(title)
     query = f"{artist} {clean}".strip()
     results = search_tracks(query, limit * 2)
-    # Put unmodified titles first
+    # Немодифицированные названия ставим первыми
     originals = [r for r in results if not is_modified_title(r["title"])]
     modified = [r for r in results if is_modified_title(r["title"])]
     return (originals + modified)[:limit]
@@ -54,6 +56,7 @@ _YDL_BASE_OPTS = {
 
 
 def _clean_entry(entry: dict) -> dict | None:
+    """Нормализует сырую запись yt-dlp в единый dict трека (или ``None`` без id)."""
     if not entry or not entry.get("id"):
         return None
 
@@ -73,6 +76,7 @@ def _clean_entry(entry: dict) -> dict | None:
 
 
 def search_tracks(query: str, limit: int = 20, offset: int = 0) -> list[dict]:
+    """Ищет треки на SoundCloud по тексту запроса (с постраничным срезом)."""
     total_needed = offset + limit
     start = offset + 1
     end = offset + limit
@@ -90,13 +94,14 @@ def search_tracks(query: str, limit: int = 20, offset: int = 0) -> list[dict]:
 _YDL_PREVIEW_OPTS = {
     "quiet": True,
     "no_warnings": True,
-    # Explicitly exclude HLS/DASH — browsers can't play them natively via Audio API.
-    # http_mp3_128k is SoundCloud's progressive MP3; fallbacks require direct HTTP(S).
+    # Явно исключаем HLS/DASH — браузеры не проигрывают их нативно через Audio API.
+    # http_mp3_128k — прогрессивный MP3 SoundCloud; запасным нужен прямой HTTP(S).
     "format": "http_mp3_128k/bestaudio[ext=mp3][protocol=https]/bestaudio[protocol=https]/bestaudio[protocol=http]",
 }
 
 
 def get_preview_url(url: str) -> dict:
+    """Возвращает прямой прогрессивный stream-URL и длительность для превью."""
     try:
         with yt_dlp.YoutubeDL(_YDL_PREVIEW_OPTS) as ydl:
             result = ydl.extract_info(url, download=False)
@@ -129,6 +134,7 @@ def get_preview_url(url: str) -> dict:
 
 
 def resolve_url(url: str) -> dict:
+    """Резолвит любой URL в трек или плейлист через yt-dlp."""
     try:
         with yt_dlp.YoutubeDL(_YDL_BASE_OPTS) as ydl:
             result = ydl.extract_info(url, download=False)

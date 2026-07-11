@@ -1,38 +1,56 @@
 import asyncio
 import logging
+import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 
 import keyring
 import keyring.errors
+
+from app.core.executor import run_blocking
 
 logger = logging.getLogger(__name__)
 
 _KEYRING_SERVICE = "soundsave"
 _KEYRING_USER = "yandex_token"
-_executor = ThreadPoolExecutor(max_workers=2)
 
-# In-memory sessions: session_id -> {device_code, status, token, error}
+# Сессии в памяти: session_id -> {status, device_code, token, error, created}.
+# Чистятся по TTL, чтобы завершённые/брошенные попытки авторизации не копились.
 _sessions: dict[str, dict] = {}
+_SESSION_TTL = 900  # секунд
+
+# Сильные ссылки на фоновые задачи опроса, чтобы их не собрал GC на лету.
+_background_tasks: set[asyncio.Task] = set()
 
 
 def get_stored_token() -> str | None:
+    """Возвращает сохранённый в keyring токен Yandex или ``None``."""
     return keyring.get_password(_KEYRING_SERVICE, _KEYRING_USER) or None
 
 
 def save_token(token: str) -> None:
+    """Сохраняет токен Yandex в системный keyring."""
     keyring.set_password(_KEYRING_SERVICE, _KEYRING_USER, token)
     logger.info("Yandex Music token saved to system keyring")
 
 
 def delete_token() -> None:
+    """Удаляет сохранённый токен Yandex из keyring (если он есть)."""
     try:
         keyring.delete_password(_KEYRING_SERVICE, _KEYRING_USER)
     except keyring.errors.PasswordDeleteError:
         pass
 
 
+def _prune_sessions() -> None:
+    """Убирает из памяти сессии авторизации, просроченные по TTL."""
+    now = time.monotonic()
+    stale = [sid for sid, s in _sessions.items() if now - s["created"] > _SESSION_TTL]
+    for sid in stale:
+        _sessions.pop(sid, None)
+
+
 def _request_code_sync() -> dict:
+    """Запрашивает device-code у Yandex (блокирующий вызов)."""
     from yandex_music import Client
 
     client = Client().init()
@@ -47,8 +65,7 @@ def _request_code_sync() -> dict:
 
 
 def _poll_token_sync(device_code: str, interval: float) -> str | None:
-    """Poll until token received or 300s timeout. Returns token string or raises."""
-    import time
+    """Опрашивает Yandex до получения токена или истечения 5-минутного таймаута."""
     from yandex_music import Client
 
     client = Client().init()
@@ -62,9 +79,9 @@ def _poll_token_sync(device_code: str, interval: float) -> str | None:
 
 
 async def start_device_auth() -> dict:
-    """Start device auth flow. Returns session_id + user_code + verification_url."""
-    loop = asyncio.get_running_loop()
-    code_info = await loop.run_in_executor(_executor, _request_code_sync)
+    """Запускает device-flow авторизации. Возвращает session_id + user_code + URL."""
+    _prune_sessions()
+    code_info = await run_blocking(_request_code_sync)
 
     session_id = str(uuid.uuid4())
     _sessions[session_id] = {
@@ -72,12 +89,14 @@ async def start_device_auth() -> dict:
         "device_code": code_info["device_code"],
         "token": None,
         "error": None,
+        "created": time.monotonic(),
     }
 
-    # Start background polling task
-    asyncio.create_task(
+    task = asyncio.create_task(
         _poll_session(session_id, code_info["device_code"], code_info["interval"])
     )
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
     return {
         "session_id": session_id,
@@ -88,12 +107,10 @@ async def start_device_auth() -> dict:
 
 
 async def _poll_session(session_id: str, device_code: str, interval: float) -> None:
-    loop = asyncio.get_running_loop()
+    """Фоновый опрос токена; по успеху сохраняет его и помечает сессию done."""
     try:
-        token = await loop.run_in_executor(
-            _executor, _poll_token_sync, device_code, interval
-        )
-        save_token(token)
+        token = await run_blocking(_poll_token_sync, device_code, interval)
+        await run_blocking(save_token, token)
         if session_id in _sessions:
             _sessions[session_id]["status"] = "done"
             _sessions[session_id]["token"] = token
@@ -106,4 +123,6 @@ async def _poll_session(session_id: str, device_code: str, interval: float) -> N
 
 
 def get_session_status(session_id: str) -> dict | None:
+    """Возвращает состояние сессии авторизации по её id или ``None``."""
+    _prune_sessions()
     return _sessions.get(session_id)

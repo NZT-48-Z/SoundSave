@@ -18,7 +18,10 @@ LEVEL_COLORS = {
 
 
 class ColorFormatter(logging.Formatter):
+    """Форматтер логов, подкрашивающий уровень записи цветом."""
+
     def format(self, record: logging.LogRecord) -> str:
+        """Раскрашивает имя уровня и форматирует запись."""
         color = LEVEL_COLORS.get(record.levelno, "")
         record.levelname = f"{color}{record.levelname:<7}{Style.RESET_ALL}"
         return super().format(record)
@@ -28,7 +31,10 @@ POLLED_PATHS = {"/api/v1/downloads"}
 
 
 class SuppressPollingFilter(logging.Filter):
+    """Фильтр access-логов: скрывает шумные запросы поллинга загрузок."""
+
     def filter(self, record: logging.LogRecord) -> bool:
+        """False для запросов к поллинг-эндпоинтам, иначе True."""
         if record.args and len(record.args) >= 3 and record.args[2] in POLLED_PATHS:
             return False
         return True
@@ -48,8 +54,8 @@ def configure_logging() -> None:
         handler.setFormatter(ColorFormatter(fmt, datefmt))
         root.addHandler(handler)
 
-    # Only our own code and uvicorn are chatty on purpose — every third-party
-    # library stays at the root's WARNING level unless explicitly allowed here.
+    # Подробно логируем только свой код и uvicorn — любая сторонняя библиотека
+    # остаётся на уровне WARNING корня, если явно не разрешена здесь.
     logging.getLogger("app").setLevel(level)
     logging.getLogger("uvicorn").setLevel(logging.INFO)
     logging.getLogger("uvicorn.access").setLevel(logging.INFO)
