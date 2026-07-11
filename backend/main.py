@@ -19,7 +19,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://localhost:5173"],
+    allow_origins=settings.CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -29,13 +29,14 @@ app.include_router(router)
 
 @app.get("/")
 async def root():
+    """Простой health-check корневого маршрута."""
     return {"status": "ok", "app": "SoundSave"}
 
 
 if __name__ == "__main__":
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host=settings.HOST,
         port=settings.PORT,
         reload=settings.DEBUG,
         log_config=None,
