@@ -5,6 +5,7 @@ import { fmtSpeed } from '../utils/format'
 import EmptyState from './EmptyState'
 
 const ACTIVE_STATUSES = new Set(['pending', 'downloading', 'converting', 'cutting', 'tagging'])
+const IN_PROGRESS_STATUSES = new Set(['downloading', 'converting', 'cutting', 'tagging'])
 
 const STATUS_MAP = {
   pending:     { label: 'Pending',     color: neutral[400],    bg: 'rgba(161,161,170,0.08)' },
@@ -38,7 +39,7 @@ function DownloadRow({ dl }) {
   }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: bg.surface, border: `1px solid ${border.default}`, borderRadius: 10 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: bg.surface, border: `1px solid ${border.default}`, borderRadius: 10, animation: 'fadeIn 0.3s ease' }}>
       <div style={{
         width: 48, height: 48, borderRadius: 7,
         background: dl.color || neutral[900],
@@ -151,7 +152,11 @@ export default function DownloadsPanel({ downloads, onClearHistory }) {
   const cancelled = downloads.filter(d => d.status === 'cancelled').length
   const total = downloads.length
 
-  const activeGroup = downloads.filter(d => ACTIVE_STATUSES.has(d.status))
+  // Реально качающиеся треки (downloading/converting/...) поднимаем над pending,
+  // иначе они теряются среди остальных, ждущих своей очереди из DOWNLOAD_CONCURRENCY.
+  const activeGroup = downloads
+    .filter(d => ACTIVE_STATUSES.has(d.status))
+    .sort((a, b) => IN_PROGRESS_STATUSES.has(b.status) - IN_PROGRESS_STATUSES.has(a.status))
   const doneGroup = downloads.filter(d => d.status === 'done')
   const failedGroup = downloads.filter(d => !ACTIVE_STATUSES.has(d.status) && d.status !== 'done')
 
