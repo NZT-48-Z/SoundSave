@@ -1,0 +1,34 @@
+services:
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DEBUG: "false"
+      DOWNLOAD_DIR: /data/music
+      DB_PATH: /data/soundsave.db
+      KEYRING_SECRET: ${SOUNDSAVE_KEYRING_SECRET:?Задайте SOUNDSAVE_KEYRING_SECRET в .env — см. .env.example}
+      KEYRING_FILE_PATH: /data/keyring.enc
+      CORS_ORIGINS: '["http://localhost:${FRONTEND_PORT:-3000}"]'
+    volumes:
+      - soundsave_data:/data
+      - ${SOUNDSAVE_MUSIC_DIR:?Задайте SOUNDSAVE_MUSIC_DIR в .env — см. .env.example}:/data/music
+    expose:
+      - "8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  soundsave_data:
