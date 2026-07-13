@@ -94,15 +94,22 @@ export default function App() {
     }
   }, [])
 
+  const activeBatchRef = useRef(activeBatch)
+  useEffect(() => { activeBatchRef.current = activeBatch }, [activeBatch])
+
   useEffect(() => {
     let cancelled = false
     let timeoutId
+    const terminal = ['done', 'error', 'cancelled']
 
     const poll = async () => {
       const data = await getDownloads()
       if (cancelled) return
       setDownloads(data)
-      timeoutId = setTimeout(poll, 800)
+      const hasActiveRow = data.some(d => !terminal.includes(d.status))
+      const hasActiveBatch = !!activeBatchRef.current && activeBatchRef.current.size > 0
+      const delay = (hasActiveRow || hasActiveBatch) ? 800 : 2500
+      timeoutId = setTimeout(poll, delay)
     }
     timeoutId = setTimeout(poll, 800)
 

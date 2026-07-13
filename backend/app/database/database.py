@@ -37,6 +37,12 @@ async def create_tables() -> None:
         from app.models import download  # noqa: F401 — регистрирует модель
 
         await conn.run_sync(Base.metadata.create_all)
+        # create_all(checkfirst=True) не создаёт индексы на уже существующих
+        # таблицах — для баз, созданных до этого индекса, нужен явный вызов.
+        await conn.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_downloads_status_started_at "
+            "ON downloads (status, started_at)"
+        )
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:

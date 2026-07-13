@@ -12,6 +12,7 @@ import yt_dlp
 from mutagen.id3 import APIC, ID3, TALB, TCON, TIT2, TPE1
 from mutagen.id3._util import ID3NoHeaderError
 
+from app.core.cache import LockedTTLCache
 from app.core.config import settings
 from app.core.constants import DownloadStatus
 from app.core.exceptions import DownloadError
@@ -101,6 +102,10 @@ _ARTWORK_MIME_BY_EXT = {
     "webp": "image/webp",
 }
 
+# Дедупликация обложек в рамках батча: плейлист/альбом обычно шарит одну
+# artwork_url на все треки — короткий TTL достаточно покрывает окно одного импорта.
+_artwork_cache = LockedTTLCache(maxsize=200, ttl=120)
+
 
 def _load_artwork(meta: DownloadRequest) -> tuple[bytes, str] | None:
     """Возвращает ``(байты, mime)`` обложки или ``None``, если её нет."""
@@ -115,13 +120,21 @@ def _load_artwork(meta: DownloadRequest) -> tuple[bytes, str] | None:
             return None
 
     if meta.artwork_url:
-        try:
-            with httpx.Client(timeout=_ARTWORK_TIMEOUT) as client:
-                r = client.get(meta.artwork_url)
-            if r.status_code == 200:
-                return r.content, r.headers.get("content-type", "image/jpeg")
-        except httpx.HTTPError as e:
-            logger.warning("Could not fetch artwork: %s", e)
+        return _artwork_cache.get_or_set(
+            meta.artwork_url, lambda: _fetch_artwork_url(meta.artwork_url)
+        )
+    return None
+
+
+def _fetch_artwork_url(url: str) -> tuple[bytes, str] | None:
+    """Скачивает обложку по URL. Без кеша — вызывается только через ``_artwork_cache``."""
+    try:
+        with httpx.Client(timeout=_ARTWORK_TIMEOUT) as client:
+            r = client.get(url)
+        if r.status_code == 200:
+            return r.content, r.headers.get("content-type", "image/jpeg")
+    except httpx.HTTPError as e:
+        logger.warning("Could not fetch artwork: %s", e)
     return None
 
 
@@ -365,58 +378,71 @@ def _cleanup_batch_dir_if_empty(batch_dir: str) -> None:
 
 
 # --------------------------------------------------------------------------- #
-# Последовательный воркер загрузок
+# Пул воркеров загрузок
 # --------------------------------------------------------------------------- #
 
 
 class DownloadQueue:
-    """Один фоновый воркер, обрабатывающий загрузки по очереди по одной."""
+    """Пул фоновых воркеров, обрабатывающих загрузки из общей очереди."""
 
     def __init__(self) -> None:
-        """Инициализирует очередь и внутреннее состояние воркера."""
+        """Инициализирует очередь и внутреннее состояние пула воркеров."""
         self._queue: asyncio.Queue[tuple[str, DownloadRequest, str]] = asyncio.Queue()
-        self._task: asyncio.Task | None = None
+        self._tasks: list[asyncio.Task] = []
         self._stopping = False
-        self._current_id: str | None = None
+        self._active_ids: set[str] = set()
 
     async def start(self) -> None:
-        """Запускает фоновую задачу-воркер под супервизией."""
+        """Запускает пул воркеров под супервизией."""
         self._stopping = False
-        self._task = asyncio.create_task(self._supervise())
+        self._tasks = [
+            asyncio.create_task(self._supervise(i))
+            for i in range(settings.DOWNLOAD_CONCURRENCY)
+        ]
 
     async def stop(self) -> None:
-        """Останавливает воркер и сигналит отмену текущей загрузке."""
+        """Останавливает пул воркеров и сигналит отмену всем активным загрузкам."""
         self._stopping = True
-        if self._current_id:
-            _request_cancel(self._current_id)
-        if self._task:
-            self._task.cancel()
-            try:
-                await self._task
-            except asyncio.CancelledError:
-                pass
+        for download_id in list(self._active_ids):
+            _request_cancel(download_id)
+        for task in self._tasks:
+            task.cancel()
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+        self._tasks = []
 
-    async def enqueue(self, meta: DownloadRequest, batch_dir: str) -> str:
-        """Создаёт запись ``pending`` и ставит загрузку в очередь, возвращая её id."""
-        download_id = str(uuid.uuid4())
-        async with async_session_factory() as session:
-            dl = Download(
-                id=download_id,
-                url=meta.url,
-                title=meta.title,
-                artist=meta.artist,
-                album=meta.album,
-                genre=meta.genre,
-                artwork_url=meta.artwork_url,
-                status=DownloadStatus.PENDING,
-                progress=0.0,
-                started_at=utcnow(),
+    async def enqueue_many(
+        self, items: list[tuple[DownloadRequest, str]]
+    ) -> list[str]:
+        """Создаёт записи ``pending`` одной транзакцией и ставит загрузки в очередь."""
+        download_ids: list[str] = []
+        rows: list[Download] = []
+        for meta, _ in items:
+            download_id = str(uuid.uuid4())
+            download_ids.append(download_id)
+            rows.append(
+                Download(
+                    id=download_id,
+                    url=meta.url,
+                    title=meta.title,
+                    artist=meta.artist,
+                    album=meta.album,
+                    genre=meta.genre,
+                    artwork_url=meta.artwork_url,
+                    status=DownloadStatus.PENDING,
+                    progress=0.0,
+                    started_at=utcnow(),
+                )
             )
-            await AsyncORM.create_download(session, dl)
+
+        async with async_session_factory() as session:
+            session.add_all(rows)
             await session.commit()
 
-        await self._queue.put((download_id, meta, batch_dir))
-        return download_id
+        for (meta, batch_dir), download_id in zip(items, download_ids):
+            await self._queue.put((download_id, meta, batch_dir))
+
+        return download_ids
 
     async def cancel(self, download_id: str) -> None:
         """Запрашивает отмену; для стоящих в очереди сразу пишет статус ``cancelled``."""
@@ -428,28 +454,31 @@ class DownloadQueue:
             await AsyncORM.mark_cancelled_if_pending(session, download_id)
             await session.commit()
 
-    async def _supervise(self) -> None:
-        """Держит воркер живым: перезапускает его при неожиданном падении."""
+    async def _supervise(self, worker_idx: int) -> None:
+        """Держит воркер #worker_idx живым: перезапускает его при неожиданном падении."""
         while not self._stopping:
             try:
                 await self._worker()
             except asyncio.CancelledError:
                 break
             except Exception:
-                logger.exception("Download worker crashed; restarting in 1s")
+                logger.exception(
+                    "Download worker %d crashed; restarting in 1s", worker_idx
+                )
                 await asyncio.sleep(1)
 
     async def _worker(self) -> None:
-        """Основной цикл: берёт задачи из очереди и обрабатывает по одной."""
+        """Основной цикл воркера: берёт задачи из общей очереди и обрабатывает их."""
         while True:
             download_id, meta, batch_dir = await self._queue.get()
+            self._active_ids.add(download_id)
             try:
                 await self._process_one(download_id, meta, batch_dir)
             except Exception:
                 logger.exception("Unexpected error processing %s", download_id)
             finally:
+                self._active_ids.discard(download_id)
                 _clear_cancel(download_id)
-                self._current_id = None
                 self._queue.task_done()
                 _cleanup_batch_dir_if_empty(batch_dir)
 
@@ -457,7 +486,6 @@ class DownloadQueue:
         self, download_id: str, meta: DownloadRequest, batch_dir: str
     ) -> None:
         """Обрабатывает одну загрузку и записывает её терминальный статус."""
-        self._current_id = download_id
         safe_title = _safe_filename(meta.title)
 
         if _is_cancelled(download_id):

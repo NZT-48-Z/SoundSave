@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from app.core.config import settings
 from app.core.executor import init_executor, shutdown_executor
+from app.core.keyring_backend import init_keyring
 from app.database.database import async_session_factory, create_tables
 from app.database.query.orm import AsyncORM
 from app.services.downloader import download_queue
@@ -16,6 +17,8 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Инициализация при старте и корректное завершение приложения."""
+    init_keyring()
+
     os.makedirs(settings.download_path, exist_ok=True)
     os.makedirs(settings.covers_path, exist_ok=True)
     logger.info("Download directory: %s", settings.download_path)

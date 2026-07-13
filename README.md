@@ -4,6 +4,7 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.12+-blue.svg" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg" alt="FastAPI"></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white" alt="Docker ready"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
 </p>
 
@@ -55,16 +56,36 @@
 
 ## 📦 Requirements
 
-- Python 3.12+
-- Node.js 18+
-- FFmpeg — **no manual install needed**, downloaded automatically
+- [Docker](https://www.docker.com/) & Docker Compose — **recommended**, everything else is handled inside the containers
+- *or*, for a manual setup: Python 3.12+, Node.js 18+, FFmpeg (auto-downloaded, no manual install needed)
 
 ## ⚡ Quick start
+
+### 🐳 Docker (recommended)
+
+The project ships with a ready-to-use `docker-compose.yml` — two containers (FastAPI backend + nginx-served frontend), FFmpeg preinstalled, no local Python/Node setup required.
 
 ```bash
 git clone https://github.com/NZT-48-Z/SoundSave.git
 cd SoundSave
+cp .env.example .env
 ```
+
+Edit `.env` and fill in the two required values:
+
+```env
+SOUNDSAVE_KEYRING_SECRET=   # generate with: openssl rand -hex 32
+SOUNDSAVE_MUSIC_DIR=        # absolute host folder for downloaded tracks, e.g. C:/Users/you/Music/SoundSave
+```
+
+```bash
+docker compose up -d --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). Downloaded tracks land directly in `SOUNDSAVE_MUSIC_DIR` on your machine; the database and the encrypted Yandex token live in a Docker-managed volume.
+
+<details>
+<summary>Manual setup (without Docker)</summary>
 
 **Backend** (terminal 1):
 
@@ -102,11 +123,15 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+</details>
+
 ---
 
 ## ⚙️ Configuration
 
-All defaults work out of the box. To override, edit `backend/.env`:
+**Docker** — all settings live in `.env` (see `.env.example`): `SOUNDSAVE_KEYRING_SECRET`, `SOUNDSAVE_MUSIC_DIR`, `FRONTEND_PORT`.
+
+**Manual setup** — all defaults work out of the box. To override, edit `backend/.env`:
 
 ```env
 PORT=8000
@@ -119,7 +144,7 @@ DEBUG=true
 
 ## 🎧 Yandex Music
 
-To import playlists from Yandex Music, connect your account first. Click the Yandex Music import button in the app and follow the OAuth flow — the token is stored locally via the system keyring.
+To import playlists from Yandex Music, connect your account first. Click the Yandex Music import button in the app and follow the OAuth flow. The token is stored locally via the system keyring (manual setup) or via an encrypted file-based keyring inside the container (Docker setup — there's no system keyring to use in Linux containers).
 
 ---
 
