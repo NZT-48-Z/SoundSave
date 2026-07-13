@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 
+from sqlalchemy import Index
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.constants import DownloadStatus
@@ -15,6 +16,7 @@ class Download(Base):
     """ORM-модель одной загрузки в таблице ``downloads``."""
 
     __tablename__ = "downloads"
+    __table_args__ = (Index("ix_downloads_status_started_at", "status", "started_at"),)
 
     id: Mapped[str] = mapped_column(primary_key=True)
     url: Mapped[str]
