@@ -3,9 +3,13 @@ import re
 
 import yt_dlp
 
+from app.core.cache import LockedTTLCache
 from app.core.exceptions import SoundCloudError
 
 logger = logging.getLogger(__name__)
+
+_search_cache = LockedTTLCache(maxsize=256, ttl=300)  # 5 минут
+_resolve_cache = LockedTTLCache(maxsize=256, ttl=1800)  # 30 минут
 
 # Шаблоны, указывающие на модифицированный/неоригинальный трек
 _MOD_PATTERN = re.compile(
@@ -76,7 +80,14 @@ def _clean_entry(entry: dict) -> dict | None:
 
 
 def search_tracks(query: str, limit: int = 20, offset: int = 0) -> list[dict]:
-    """Ищет треки на SoundCloud по тексту запроса (с постраничным срезом)."""
+    """Ищет треки на SoundCloud по тексту запроса (с постраничным срезом, кешируется)."""
+    return _search_cache.get_or_set(
+        (query, limit, offset), lambda: _search_tracks_uncached(query, limit, offset)
+    )
+
+
+def _search_tracks_uncached(query: str, limit: int, offset: int) -> list[dict]:
+    """Тело ``search_tracks`` без кеша — сетевой запрос к SoundCloud через yt-dlp."""
     total_needed = offset + limit
     start = offset + 1
     end = offset + limit
@@ -134,7 +145,12 @@ def get_preview_url(url: str) -> dict:
 
 
 def resolve_url(url: str) -> dict:
-    """Резолвит любой URL в трек или плейлист через yt-dlp."""
+    """Резолвит любой URL в трек или плейлист через yt-dlp (кешируется)."""
+    return _resolve_cache.get_or_set(url, lambda: _resolve_url_uncached(url))
+
+
+def _resolve_url_uncached(url: str) -> dict:
+    """Тело ``resolve_url`` без кеша — сетевой запрос через yt-dlp."""
     try:
         with yt_dlp.YoutubeDL(_YDL_BASE_OPTS) as ydl:
             result = ydl.extract_info(url, download=False)
