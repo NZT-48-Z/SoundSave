@@ -8,6 +8,7 @@ from sqlalchemy import select
 from app.api.dependencies import DbSession
 from app.core.config import settings
 from app.core.constants import TERMINAL_STATUSES
+from app.core.executor import run_blocking
 from app.database.query.orm import AsyncORM
 from app.models.download import Download
 from app.schemas.download import BulkDownloadRequest, DownloadRecord
@@ -19,11 +20,20 @@ logger = logging.getLogger(__name__)
 _COVERS_URL_MARKER = "/api/v1/covers/"
 
 
+def _remove_cover_files(paths: list[str]) -> None:
+    """Удаляет файлы обложек, молча игнорируя отсутствующие/ошибки ОС."""
+    for path in paths:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+
+
 @router.post("/download/bulk")
 async def bulk_download(req: BulkDownloadRequest):
     """Ставит пачку треков в очередь загрузки, возвращает их id."""
     batch_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    ids = [await download_queue.enqueue(item, batch_dir) for item in req.items]
+    ids = await download_queue.enqueue_many([(item, batch_dir) for item in req.items])
     return {"ids": ids, "count": len(ids)}
 
 
@@ -67,12 +77,10 @@ async def clear_history(db: DbSession):
 
     count = await AsyncORM.clear_finished_downloads(db)
 
-    for url in cover_urls:
-        filename = os.path.basename(url.split(_COVERS_URL_MARKER)[-1])
-        path = os.path.join(settings.covers_path, filename)
-        try:
-            os.remove(path)
-        except OSError:
-            pass
+    paths = [
+        os.path.join(settings.covers_path, os.path.basename(url.split(_COVERS_URL_MARKER)[-1]))
+        for url in cover_urls
+    ]
+    await run_blocking(_remove_cover_files, paths)
 
     return {"deleted": count}
