@@ -1,9 +1,12 @@
 import logging
 import re
 
+from app.core.cache import LockedTTLCache
 from app.core.exceptions import YandexError, YandexNotConnectedError
 
 logger = logging.getLogger(__name__)
+
+_playlist_cache = LockedTTLCache(maxsize=64, ttl=600)  # 10 минут
 
 # https://music.yandex.ru/users/<login>/playlists/<kind>  (kind — целое число)
 _USER_PLAYLIST_RE = re.compile(r"/users/([^/?#]+)/playlists/(\d+)", re.I)
@@ -46,10 +49,15 @@ def _track_to_dict(track) -> dict:
 
 
 def fetch_yandex_playlist(url: str) -> list[dict]:
-    """Загружает метаданные треков плейлиста Yandex Music по URL.
+    """Загружает метаданные треков плейлиста Yandex Music по URL (кешируется).
 
     Блокирующая (сеть + keyring) — вызывать из потока пула, а не из event loop.
     """
+    return _playlist_cache.get_or_set(url, lambda: _fetch_yandex_playlist_uncached(url))
+
+
+def _fetch_yandex_playlist_uncached(url: str) -> list[dict]:
+    """Тело ``fetch_yandex_playlist`` без кеша."""
     from yandex_music import Client
 
     from app.services.yandex_auth import get_stored_token
