@@ -26,6 +26,16 @@ class Settings(BaseSettings):
     # ffmpeg, keyring, yandex-music) с event loop.
     THREAD_POOL_WORKERS: int = 12
 
+    # Число загрузок, обрабатываемых одновременно (каждая — из общего пула потоков).
+    # Не должно приближаться к THREAD_POOL_WORKERS: пул также обслуживает поиск,
+    # резолв и артворк.
+    DOWNLOAD_CONCURRENCY: int = 3
+
+    # Если задан — keyring переключается на файловый бэкенд (для контейнеров без
+    # системного хранилища секретов), Yandex-токен шифруется этим значением.
+    KEYRING_SECRET: str | None = None
+    KEYRING_FILE_PATH: str = "./keyring.enc"
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
@@ -47,6 +57,11 @@ class Settings(BaseSettings):
     def max_cover_upload_bytes(self) -> int:
         """Максимальный размер загружаемой обложки в байтах."""
         return self.MAX_COVER_UPLOAD_MB * 1024 * 1024
+
+    @property
+    def keyring_file_path_abs(self) -> str:
+        """Абсолютный путь к файлу файлового keyring-бэкенда."""
+        return os.path.abspath(os.path.expanduser(self.KEYRING_FILE_PATH))
 
 
 settings = Settings()
