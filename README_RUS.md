@@ -4,6 +4,7 @@
   <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/Python-3.12+-blue.svg" alt="Python"></a>
   <a href="https://fastapi.tiangolo.com/"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg" alt="FastAPI"></a>
   <a href="https://react.dev/"><img src="https://img.shields.io/badge/React-18-61DAFB.svg" alt="React"></a>
+  <a href="https://www.docker.com/"><img src="https://img.shields.io/badge/Docker-ready-2496ED.svg?logo=docker&logoColor=white" alt="Docker ready"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green.svg" alt="License"></a>
 </p>
 
@@ -55,16 +56,36 @@
 
 ## 📦 Требования
 
-- Python 3.12+
-- Node.js 18+
-- FFmpeg — **ручная установка не нужна**, скачивается автоматически
+- [Docker](https://www.docker.com/) и Docker Compose — **рекомендуемый способ**, всё остальное уже настроено внутри контейнеров
+- *или*, для ручного запуска: Python 3.12+, Node.js 18+, FFmpeg (скачивается автоматически, ручная установка не нужна)
 
 ## ⚡ Быстрый старт
+
+### 🐳 Docker (рекомендуется)
+
+В проекте уже есть готовый `docker-compose.yml` — два контейнера (FastAPI-бэкенд + фронтенд на nginx), FFmpeg предустановлен, локально ставить Python/Node не нужно.
 
 ```bash
 git clone https://github.com/NZT-48-Z/SoundSave.git
 cd SoundSave
+cp .env.example .env
 ```
+
+Открой `.env` и заполни два обязательных значения:
+
+```env
+SOUNDSAVE_KEYRING_SECRET=   # сгенерировать: openssl rand -hex 32
+SOUNDSAVE_MUSIC_DIR=        # абсолютный путь на хосте для скачанных треков, например C:/Users/you/Music/SoundSave
+```
+
+```bash
+docker compose up -d --build
+```
+
+Открой [http://localhost:3000](http://localhost:3000). Скачанные треки сразу попадают в `SOUNDSAVE_MUSIC_DIR` на твоём диске; база данных и зашифрованный Yandex-токен хранятся в служебном Docker-volume.
+
+<details>
+<summary>Ручная установка (без Docker)</summary>
 
 **Backend** (терминал 1):
 
@@ -102,11 +123,15 @@ npm run dev
 
 Открой [http://localhost:3000](http://localhost:3000).
 
+</details>
+
 ---
 
 ## ⚙️ Конфигурация
 
-Все настройки по умолчанию работают без изменений. Для переопределения отредактируй `backend/.env`:
+**Docker** — все настройки в `.env` (см. `.env.example`): `SOUNDSAVE_KEYRING_SECRET`, `SOUNDSAVE_MUSIC_DIR`, `FRONTEND_PORT`.
+
+**Ручная установка** — все настройки по умолчанию работают без изменений. Для переопределения отредактируй `backend/.env`:
 
 ```env
 PORT=8000
@@ -119,7 +144,7 @@ DEBUG=true
 
 ## 🎧 Яндекс Музыка
 
-Для импорта плейлистов подключи аккаунт: нажми кнопку импорта в приложении и пройди OAuth-авторизацию — токен сохраняется локально через системный keyring.
+Для импорта плейлистов подключи аккаунт: нажми кнопку импорта в приложении и пройди OAuth-авторизацию. Токен хранится локально через системный keyring (ручная установка) либо через зашифрованный файловый keyring внутри контейнера (Docker — в Linux-контейнере системного keyring попросту нет).
 
 ---
 
