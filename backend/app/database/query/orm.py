@@ -28,9 +28,13 @@ class AsyncORM:
         return result.scalar_one_or_none()
 
     @staticmethod
-    async def get_all_downloads(db: AsyncSession) -> Sequence[Download]:
-        """Возвращает все загрузки, новые первыми (по ``started_at``)."""
-        result = await db.execute(select(Download).order_by(Download.started_at.desc()))
+    async def get_all_downloads(
+        db: AsyncSession, limit: int = 300
+    ) -> Sequence[Download]:
+        """Возвращает последние ``limit`` загрузок, новые первыми (по ``started_at``)."""
+        result = await db.execute(
+            select(Download).order_by(Download.started_at.desc()).limit(limit)
+        )
         return result.scalars().all()
 
     @staticmethod
