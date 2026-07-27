@@ -8,6 +8,7 @@ import keyring
 import keyring.backend
 import keyring.errors
 from cryptography.fernet import Fernet, InvalidToken
+from keyring.compat import properties
 
 from app.core.config import settings
 
@@ -29,7 +30,14 @@ class FileKeyring(keyring.backend.KeyringBackend):
     ``KEYRING_SECRET``, иначе используется обычный системный keyring.
     """
 
-    priority = 1  # выбирается явно через keyring.set_keyring(), а не auto-discovery
+    @properties.classproperty
+    def priority(cls) -> float:
+        """Не-viable без ``KEYRING_SECRET`` — keyring сам обходит все зарегистрированные
+        бэкенды при auto-discovery (get_all_keyring), а не только через set_keyring().
+        """
+        if not settings.KEYRING_SECRET:
+            raise RuntimeError("KEYRING_SECRET is not set")
+        return 1
 
     def __init__(self) -> None:
         super().__init__()
